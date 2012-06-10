@@ -38,6 +38,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern "C" {
 
+// Force libGL.abc to get linked in
+extern int __libgl_abc__;
+void __libgl_abc__linker_hack() { __libgl_abc__ = 0; }
+
 #define null 0
 
 class VertexBufferBuilder
@@ -192,9 +196,6 @@ extern void glVertex2i (GLint x, GLint y)
     float fx = (float)x;
     float fy = (float)y;
     float fz = (float)0.0f;
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -202,9 +203,6 @@ extern void glTexCoord2f (GLfloat s, GLfloat t)
 {
     float fs = (float)s;
     float ft = (float)t;
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glTexCoord(%0, %1);\n" : : "r"(fs), "r"(ft));
     vbb.glTexCoord(fs, ft);
 }
 
@@ -222,15 +220,11 @@ extern void glRotated (GLdouble angle, GLdouble x, GLdouble y, GLdouble z)
 
 extern void glEnd (void)
 {
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glEnd();\n");
     vbb.glEnd();
 }
 
 extern void glBegin (GLenum mode)
 {
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glBegin(%0);\n" : : "r"(mode));
     vbb.reset(mode);
 }
 
@@ -266,9 +260,6 @@ extern void glVertex3fv (const GLfloat *v)
     float fx = (float)v[0];
     float fy = (float)v[1];
     float fz = (float)v[2];
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -277,9 +268,6 @@ extern void glVertex3dv (const GLdouble *v)
     float fx = (float)v[0];
     float fy = (float)v[1];
     float fz = (float)v[2];
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -519,7 +507,6 @@ extern void glMatrixMode (GLenum mode)
            "GLAPI.instance.glMatrixMode(%0)\n" : : "r"(mode));
 }
 
-//                   GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const GLvoid*)
 extern void glTexImage2D (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels)
 {
     inline_as3("import Stage3DGL.GLAPI;\n"\
@@ -747,15 +734,84 @@ inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElement
     glEnd();
 }
 
+extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
+{
+    glBegin(mode);
+
+    switch(mode) {
+    case GL_TRIANGLES:
+        for(int i=first; i<first+count; i++) {
+
+            if(AState.colors.enabled) {
+                GLubyte *cptr;
+                if(AState.colors.type == GL_UNSIGNED_BYTE && AState.colors.size == 4) {
+                    cptr = getUBytePtr(AState.colors.ptr, max(AState.colors.stride, AState.colors.size), i);
+                } else {
+                    if(verboseDebug) {
+                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
+                    }
+                }
+
+                glColor4ub(cptr[0], cptr[1], cptr[2], cptr[3]);
+            }
+
+            if(AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled) {
+                GLfloat *tptr;
+                if(AState.texcoords[activeTextureUnit - GL_TEXTURE0].type == GL_FLOAT && AState.texcoords[activeTextureUnit - GL_TEXTURE0].size == 2) {
+                    tptr = getFloatPtr(AState.texcoords[activeTextureUnit - GL_TEXTURE0].ptr, max(AState.texcoords[activeTextureUnit - GL_TEXTURE0].stride, AState.texcoords[activeTextureUnit - GL_TEXTURE0].size*sizeof(GLfloat)), i);
+                } else {
+                    if(verboseDebug) {
+                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
+                    }
+                }
+
+                glTexCoord2f(tptr[0], tptr[1]);
+            }
+
+            if(AState.verts.enabled) {
+                GLfloat *vptr;
+                if(AState.verts.type == GL_FLOAT) {
+                    vptr = getFloatPtr(AState.verts.ptr, max(AState.verts.stride, AState.verts.size*sizeof(GLfloat)), i);
+                } else {
+                    if(verboseDebug) {
+                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
+                    }
+                }
+                switch(AState.verts.size) {
+                case 2:
+                    glVertex2f(vptr[0], vptr[1]);
+                    break;
+                case 3:
+                    glVertex3f(vptr[0], vptr[1], vptr[2]);
+                    break;
+                default:
+                    if(verboseDebug) {
+inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
+                    }
+                    break;
+                }
+            }
+        }
+        break;
+    default:
+        if(verboseDebug) {
+            inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
+        }
+        if(verboseDebug) {
+inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',');\n" : : "r"(mode), "r"(count));
+        }
+        break;
+    }
+
+    glEnd();
+}
+
 extern void glColorPointer (GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     AState.colors.size = size;
     AState.colors.type = type;
     AState.colors.stride = stride;
     AState.colors.ptr = pointer;
-
-    //inline_as3("import Stage3DGL.GLAPI;\n"\
-    //         "GLAPI.instance.send('stubbed glColorPointer '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(size), "r"(type), "r"(stride), "r"(pointer));
 }
 
 extern void glVertexPointer (GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
@@ -764,9 +820,6 @@ extern void glVertexPointer (GLint size, GLenum type, GLsizei stride, const GLvo
     AState.verts.type = type;
     AState.verts.stride = stride;
     AState.verts.ptr = pointer;
-
-    //inline_as3("import Stage3DGL.GLAPI;\n"\
-    //         "GLAPI.instance.send('stubbed glVertexPointer '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(size), "r"(type), "r"(stride), "r"(pointer));
 }
 
 extern void glTexCoordPointer (GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
@@ -775,9 +828,6 @@ extern void glTexCoordPointer (GLint size, GLenum type, GLsizei stride, const GL
     AState.texcoords[activeTextureUnit - GL_TEXTURE0].type = type;
     AState.texcoords[activeTextureUnit - GL_TEXTURE0].stride = stride;
     AState.texcoords[activeTextureUnit - GL_TEXTURE0].ptr = pointer;
-
-    //inline_as3("import Stage3DGL.GLAPI;\n"\
-    //         "GLAPI.instance.send('stubbed glTexCoordPointer '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(size), "r"(type), "r"(stride), "r"(pointer));
 }
 
 extern void glReadPixels (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels)
@@ -803,9 +853,6 @@ extern void glVertex2f (GLfloat x, GLfloat y)
     float fx = (float)x;
     float fy = (float)y;
     float fz = (float)0.0f;
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -912,9 +959,6 @@ extern void glNormal3fv (const GLfloat *v)
     float nx = (float)v[0];
     float ny = (float)v[1];
     float nz = (float)v[2];
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glNormal(%0, %1, %2);\n" : : "r"(nx), "r"(ny), "r"(nz));
     vbb.glNormal(nx, ny, nz);
 }
 
@@ -923,9 +967,6 @@ extern void glNormal3dv (const GLdouble *v)
     float nx = (float)v[0];
     float ny = (float)v[1];
     float nz = (float)v[2];
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glNormal(%0, %1, %2);\n" : : "r"(nx), "r"(ny), "r"(nz));
     vbb.glNormal(nx, ny, nz);
 }
 
@@ -933,9 +974,6 @@ extern void glTexCoord2fv (const GLfloat *v)
 {
     float fs = (float)v[0];
     float ft = (float)v[1];
-
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glTexCoord(%0, %1);\n" : : "r"(fs), "r"(ft));
     vbb.glTexCoord(fs, ft);
 }
 
@@ -999,9 +1037,6 @@ extern void glVertex3f (GLfloat x, GLfloat y, GLfloat z)
     float fx = (float)x;
     float fy = (float)y;
     float fz = (float)z;
-
-    //inline_as3("import Stage3DGL.GLAPI;\n"\
-    //         "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -1010,9 +1045,6 @@ extern void glVertex3d (GLdouble x, GLdouble y, GLdouble z)
     float fx = (float)x;
     float fy = (float)y;
     float fz = (float)z;
-
-    //inline_as3("import Stage3DGL.GLAPI;\n"\
-    //         "GLAPI.instance.glVertex(%0, %1, %2);\n" : : "r"(fx), "r"(fy), "r"(fz));
     vbb.glVertex(fx, fy, fz);
 }
 
@@ -1042,15 +1074,11 @@ extern void glColor3d (GLdouble red, GLdouble green, GLdouble blue)
 
 extern void glNormal3f (GLfloat nx, GLfloat ny, GLfloat nz)
 {
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glNormal(%0, %1, %2);\n" : : "r"(nx), "r"(ny), "r"(nz));
     vbb.glNormal(nx, ny, nz);
 }
 
 extern void glNormal3d (GLdouble nx, GLdouble ny, GLdouble nz)
 {
-//  inline_as3("import Stage3DGL.GLAPI;\n"\
-//             "GLAPI.instance.glNormal(%0, %1, %2);\n" : : "r"(nx), "r"(ny), "r"(nz));
     vbb.glNormal(nx, ny, nz);
 }
 
@@ -1225,7 +1253,7 @@ extern void glAlphaFunc (GLenum func, GLclampf ref)
 #include <stdio.h>
 #include <GL/gl.h>
 
-static int stubMsg = 1;
+static int stubMsg = 0;
 extern void glAccum (GLenum op, GLfloat value)
 {
     if(stubMsg) {
@@ -1617,14 +1645,6 @@ extern void glDepthRange (GLclampd zNear, GLclampd zFar)
         fprintf(stderr, "stubbed glDepthRange...\n");
     }
 }
-
-extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
-{
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glDrawArrays...\n");
-    }
-}
-
 
 extern void glDrawPixels (GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels)
 {

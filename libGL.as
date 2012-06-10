@@ -34,7 +34,6 @@ package Stage3DGL
 {
     import com.adobe.utils.*;
     import com.adobe.utils.macro.*;
-    import com.adobe.alchemy.CModule;
     
     import flash.display.*;
     import flash.display3D.*;
@@ -48,446 +47,128 @@ package Stage3DGL
     import flash.trace.Trace;
     import flash.utils.*;
 
-    public class GLAPI
-    {   
+    // Linker trickery
+    [Csym("D", "___libgl_abc__", ".data")]
 
-        // -------------------------------------------------------------------
-        // Debug console
-        
-        private var lsitDisabled:Dictionary = new Dictionary()
-        private var texturesShown:Dictionary = new Dictionary()
-        private var bgColorOverride:Boolean = false
-        private var overrideR:uint
-        private var overrideG:uint
-        private var overrideB:uint
-        private const overrideA:uint = 0xFF
+    public class GLAPI
+    {
+        include 'libGLconsts.as';
+
+        private static var _instance:GLAPI
 
         public var disableCulling:Boolean = false
         public var disableBlending:Boolean = false
-        
+        public var log:Object = null; // new TraceLog();
+        public var context:Context3D
+        public var genOnBind:Boolean = false
+
         private var _stage:Stage
+        private var overrideR:uint
+        private var overrideG:uint
+        private var overrideB:uint
+        private var overrideA:uint = 0xFF
+        private var scissorRect:Rectangle
+        private var contextEnableScissor:Boolean = false
+        private var bgColorOverride:Boolean = false
+        private var fixed_function_programs:Dictionary = new Dictionary()
+        private var contextDepthFunction:String = Context3DCompareMode.LESS
+        private var reusableCommandList:CommandList = new CommandList()
+        private var reusableVertexBuffers:Dictionary = new Dictionary()
+        private var immediateVertexBuffers:VertexBufferPool = new VertexBufferPool()
+        private var sharedIndexBuffers:Dictionary = new Dictionary()
+        private var contextColor:Vector.<Number> = new <Number>[1, 1, 1, 1]
+        private var frontFaceClockWise:Boolean = false // we default to CCW
+        private var glCullMode:uint = GL_BACK
+        private var lightingStates:Vector.<LightingState> = new Vector.<LightingState>()
+        private static var texID:uint = 1 // so we have 0 as non-valid id
+        private const consts:Vector.<Number> = new <Number>[0.0, 0.5, 1.0, 2.0]
+        private const zeroes:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
+        private var shininessVec:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
+        private var globalAmbient:Vector.<Number> = new <Number>[0.2, 0.2, 0.2, 1]
+        private var polygonOffsetValue:Number = -0.0005
+        private var lights:Vector.<Light> = new Vector.<Light>(8)
+        private var lightsEnabled:Vector.<Boolean> = new Vector.<Boolean>(8)
+        private var enableTexGenS:Boolean = false
+        private var enableTexGenT:Boolean = false
+        private var texGenParamS:uint = GL_SPHERE_MAP
+        private var texGenParamT:uint = GL_SPHERE_MAP
+        private var contextWidth:int = 0
+        private var contextHeight:int = 0
+        private var contextAA:int = 0
+        private var contextClearR:Number
+        private var contextClearG:Number
+        private var contextClearB:Number
+        private var contextClearA:Number
+        private var contextClearDepth:Number = 1.0
+        private var contextClearStencil:uint = 0
+        private var contextClearMask:uint
+        private var contextEnableStencil:Boolean = false
+        private var contextEnableAlphaTest:Boolean = false
+        private var contextStencilActionStencilFail:String = Context3DStencilAction.KEEP
+        private var contextStencilActionDepthFail:String = Context3DStencilAction.KEEP
+        private var contextStencilActionPass:String = Context3DStencilAction.KEEP
+        private var contextStencilCompareMode:String = Context3DCompareMode.ALWAYS
+        private var contextEnableDepth:Boolean = true
+        private var contextDepthMask:Boolean = true
+        private var contextSrcBlendFunc:String = Context3DBlendFactor.ZERO
+        private var contextDstBlendFunc:String = Context3DBlendFactor.ONE
+        private var contextEnableCulling:Boolean
+        private var contextEnableBlending:Boolean
+        private var contextDepthFunc:String = Context3DCompareMode.ALWAYS
+        private var contextEnableTextures:Boolean = false
+        private var contextEnableLighting:Boolean = false
+        private var contextColorMaterial:Boolean = false
+        private var contextSeparateSpecular:Boolean = false
+        private var contextEnablePolygonOffset:Boolean = false
+        private var needClear:Boolean = true
+        private var vertexAttributesDirty:Boolean = true
+        private var activeCommandList:CommandList = null
+        private var commandLists:Vector.<CommandList> = null
+        private var dataBuffers:Dictionary = new Dictionary()
+        private var frameBuffers:Dictionary = new Dictionary()
+        private var renderBuffers:Dictionary = new Dictionary()
+        private var programs:Dictionary = new Dictionary()
+        private var shaders:Dictionary = new Dictionary()
+        private var textures:Dictionary = new Dictionary()
+        private var vertexBufferAttributes:Vector.<VertexBufferAttribute> = new Vector.<VertexBufferAttribute>(8)
+        private var textureUnits:Array = new Array(32)
+        private var activeProgram:ProgramInstance
+        private var activeTextureUnit:uint = 0
 
-        private var debugUI:Sprite
-        private var console:TextField
-        private var consoleInput:TextField
-        private function createDebugUI():void
-        {
-            // Main Panel
-            debugUI = new Sprite()
-            debugUI.graphics.lineStyle(2, 0xFF0000)
-            debugUI.graphics.beginFill(0xFF0000, 0.2)
-            debugUI.graphics.drawRect(0, 0, 1000, 350)
-            debugUI.graphics.endFill()
-            
-            console = new TextField()
-            console.wordWrap = true
-            console.width = 900
-            console.height = 300
-            console.x = 50
-            console.y = 10
-            console.selectable = true
-            console.text = "--------------"
-            debugUI.addChild(console)
+        private var activeTexture:TextureInstance
+        private var textureSamplers:Vector.<TextureInstance> = new Vector.<TextureInstance>(8)
+        private var textureSamplerIDs:Vector.<uint> = new Vector.<uint>(8)
+        private var framestamp:uint = 1
+        private var vertexBufferPool:Dictionary = new Dictionary()
+        private var indexBufferPool:Dictionary = new Dictionary()
+        private var squentialTripStripIndexBufferPool:Dictionary = new Dictionary()
+        private var offsetFactor:Number = 0.0
+        private var offsetUnits:Number = 0.0
+        private var glStateFlags:uint = 0
+        private var clipPlanes:Vector.<Number> = new Vector.<Number>(6 * 4)    // space for 6 clip planes
+        private var clipPlaneEnabled:Vector.<Boolean> = new Vector.<Boolean>(8) // defaults to false
+        private var modelViewStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
+        private var projectionStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
+        private var textureStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
+        private var currentMatrixStack:Vector.<Matrix3D> = modelViewStack
+ 
+        // bit 0 = whether textures are enabled
+        private const ENABLE_TEXTURE_OFFSET:uint = 0
+        // bits 1-6 = whether clip planes 0-5 are enabled
+        private const ENABLE_CLIPPLANE_OFFSET:uint = 1
+        // bit 7 = whether color material is enabled
+        private const ENABLE_COLOR_MATERIAL_OFFSET:uint = 7
+        // bit 8 = whether lighting is enabled
+        private const ENABLE_LIGHTING_OFFSET:uint = 8
+        // bit 9-16 = whether lights 0-7 are enabled
+        private const ENABLE_LIGHT_OFFSET:uint = 9
+        // bit 17 = whether specular is separate
+        private const ENABLE_SEPSPEC_OFFSET:uint = 17
+        // bit 18 = whether polygon offset is enabled
+        private const ENABLE_POLYGON_OFFSET:uint = 18
 
-            var prompt:TextField = new TextField()
-            prompt.x = 50
-            prompt.y = 320
-            prompt.height = 14
-            prompt.text = ">"
-            debugUI.addChild(prompt)
-            
-            consoleInput = new TextField()
-            consoleInput.type = TextFieldType.INPUT
-            consoleInput.x = 60
-            consoleInput.y = 320
-            consoleInput.height = 14
-            consoleInput.width = 900
-            consoleInput.text = ""
-            consoleInput.multiline = true
-            //consoleInput.addEventListener(flash.events.TextEvent.TEXT_INPUT, consoleInput_handler, false, 0, true)
-            consoleInput.addEventListener(Event.CHANGE, consoleInput_changeHandler, false, 0, true)
-            debugUI.addChild(consoleInput)
-        }
+        private var contextMaterial:Material = new Material(true)
 
-        private function keyDown_handler(event:KeyboardEvent):void 
-        {
-            /*if (event.keyCode == 17) // shift 
-            {
-                var visible:Boolean = debugUI && debugUI.parent != null
-                showConsole(!visible)
-            }*/ 
-        } 
-        
-        public function consoleInput_changeHandler(e:Event):void
-        {
-            var text:String = consoleInput.text
-            // Did the user press "return"?
-            var returnIndex:int = Math.max(text.indexOf("\n"), text.indexOf("\r"))
-            if (returnIndex == -1)
-                return
-            
-            var command:String = consoleInput.text
-            console.appendText("\n > " + command)
-            console.scrollV = console.maxScrollV
-            consoleInput.text = ""
-            processCommand(command)
-        }
-        
-        public function consoleOut(value:String):void
-        {
-            if(console)
-                console.appendText("\n" + value)
-            trace(value)
-        }
-        
-        public function processCommand(command:String):void
-        {
-            var args:Array = command.substr(0, command.length - 1).split(" ")
-            switch (args[0])
-            {
-                case "": break
-                case "show" : 
-                    if (args.length >= 3) 
-                        processShowCommand(args)
-                    else
-                        consoleOut("wrong args, expected more, for example \"show tex all\" or \"show tex 3\"")
-                break
-                case "hide" : 
-                    if (args.length >= 3) 
-                        processHideCommand(args)
-                    else
-                        consoleOut("wrong args, expected more, for example \"hide tex all\" or \"hide tex 3\"")
-                break
-                case "bgcolor" : 
-                    if (args.length >= 2)
-                        setClearColor(args)
-                    else
-                        consoleOut("wrong args, expected more, for example \"bgcolor 0x000000\" or \"bgcolor 0xFF\", (alpha is always 255)")
-                break
-                case "q3":
-                    if(args[1] == "znear") {
-                        CModule.write32(CModule.getPublicSym("q3_znear"), int(args[2]))
-                    }
-                    if(args[1] == "zfar") {
-                        CModule.write32(CModule.getPublicSym("q3_zfar"), int(args[2]))
-                    }
-                    if(args[1] == "zneao") {
-                        CModule.write32(CModule.getPublicSym("q3_znearo"), int(args[2]))
-                    }
-                    if(args[1] == "zfaro") {
-                        CModule.write32(CModule.getPublicSym("q3_zfaro"), int(args[2]))
-                    }
-                    break
-                case "log":
-                    if (args.length >= 2)
-                    {
-                        if (args[1] == "on")
-                        {
-                            this.log = new TraceLog()
-                        }
-                        else if (args[1] == "off")
-                        {
-                            this.log = null
-                        }
-                        else
-                            consoleOut("wrong args, expected for example \"log on \" or \"log off\"")
-                    }
-                    else
-                        consoleOut("wrong args, expected more, for example \"log on \" or \"log off\"")
-                break
-                case "offset" :
-                    if (args.length >= 2)
-                    {
-                        this.polygonOffsetValue = Number(args[1])
-                        consoleOut("Setting polygonOffset to " + this.polygonOffsetValue)
-                    }
-                    else
-                        consoleOut("wrong args, expected \"offset 0.1\" for example")
-                break
-                case "errorchecking":
-                    if (args.length >= 2)
-                    {
-                        if (args[1] == "on")
-                        {
-                            //this.log = new TraceLog()
-                            this.context.enableErrorChecking = true
-                        }
-                        else if (args[1] == "off")
-                        {
-                            this.context.enableErrorChecking = false
-                        }
-                        else
-                            consoleOut("wrong args, expected for example \"errorchecking on \" or \"errorchecking off\"")
-                    }
-                    else
-                        consoleOut("wrong args, expected more, for example \"errorchecking on \" or \"errorchecking off\"")
-                    break
-                case "help" :
-                    consoleOut("------------------ HELP ------------------")
-                    consoleOut("[show, hide] list [#, all] - show or hide specified gl command lists.")
-                    consoleOut("[show, hide] tex [#, all] - show or hide specified debug textures.")
-                    consoleOut("[show, hide] texlist [#, all] - show or hide debug textures associated with specified command list.")
-                    consoleOut("bgcolor [set, clear] [hex color] - override current background color. \"clear\" will remove the override.")
-                    consoleOut("log [on, off] turn logging on and off.")
-                break
-                default:
-                    consoleOut("unknown command")
-                break
-            }
-        }
-        
-        private function setClearColor(args:Array):void
-        {
-            switch (args[1])
-            {
-                case "clear": 
-                    bgColorOverride = false
-                    consoleOut("bgcolor cleared.")
-                    break
-                case "set":
-                    bgColorOverride = true
-                    var color:uint = args[2]
-                    // useful info from: http://sierakowski.eu/list-of-tips/
-                    overrideR = (color >> 16) & 0xFF
-                    overrideG = (color >> 8) & 0xFF
-                    overrideB = color & 0xFF
-                    consoleOut("bgcolor set to " + color.toString(16))
-                    break
-                default:
-                    consoleOut("Unknown bgcolor target " + args[1] + ", try [clear or set]")
-            }
-        }
-        
-        private function toggleAllTextures(show:Boolean):void
-        {
-            var count:int = texID - 1
-            for (var i:int = 1; i <= count; i++)
-            {
-                texturesShown[i] = show
-            }
-        }
-        
-        private function toggleTexturesForList(id:int, show:Boolean):void
-        {
-            const cl:CommandList = commandLists[id]
-            const count:int = cl.commands.length
-            var command:Object
-            for (var k:int = 0; k < count; k++)
-            {
-                command = cl.commands[k]
-                var stateChange:ContextState = command as ContextState
-                if (stateChange && stateChange.textureSamplers)
-                {
-                    // grab textures associated with this list.
-                    for (var i:int = 0; i < 8; i++ )
-                    {
-                        var tID:int = stateChange.textureSamplers[i]
-                        if (tID != -1)
-                        {
-                            texturesShown[tID] = show
-                            consoleOut("texture " + tID + (show ? " shown" : " hidden"))
-                        }
-                    }
-                }
-            }
-        }
-        
-        public function renderDebugHelpers():void
-        {
-            if (debugTexQuadID == -1)
-            {
-                debugTexQuadID = glGenLists(1)
-                glNewList(debugTexQuadID, 0)
-                glBegin(GL_QUADS)
-                glTexCoord(0, 0)
-                glColor(1, 0, 0, 1)
-                glVertex(0, 0, 0)
-                
-                glTexCoord(1, 0)
-                glColor(1, 0, 0, 1)
-                glVertex(1, 0, 0)
-                
-                glTexCoord(1, 1)
-                glColor(0, 0, 0, 1)
-                glVertex(1, 1, 0)
-                
-                glTexCoord(0, 1)
-                glColor(0, 1, 0, 1)
-                glVertex(0, 1, 0)
-                glEnd()
-                glEndList()
-            }
-            
-            var texPerRow:int = 15
-            var w:Number = 1.8 / Number(texPerRow)
-            var h:Number = w
-            var x:Number = -0.9
-            var y:Number = 0.5 - h
-            
-            var mStack:Vector.<Matrix3D> = modelViewStack
-            var pStack:Vector.<Matrix3D> = projectionStack
-            
-            modelViewStack = new <Matrix3D>[ new Matrix3D()]
-            projectionStack = new <Matrix3D>[ new Matrix3D()]
-            
-            glMatrixMode(GLAPI.GL_MODELVIEW)
-            for (var i:int = 1; i < texID; i++)
-            {
-                if (texturesShown[i] != true)
-                    continue
-                glPushMatrix()
-                glTranslate(x + Math.round(i % texPerRow) * (w + 0.02), y - Math.round(i / texPerRow) * (h + 0.02), 0)
-                glScale(2 / texPerRow, 2 / texPerRow, 1)
-                glBindTexture(GL_TEXTURE_2D, i)
-                glCallList(debugTexQuadID)
-                glPopMatrix()
-            }
-            
-            modelViewStack = mStack
-            projectionStack = pStack
-            glMatrixMode(GLAPI.GL_MODELVIEW)
-        }
-        
-        private function processHideCommand(args:Array):void
-        {
-            var i:int
-            var id:int
-            switch (args[1])
-            {
-                case "list" :
-                    if (args[2] == "all")
-                    {
-                        var count:int = this.commandLists.length - 1
-                        for (i = 0; i < count; i++)
-                        {
-                            lsitDisabled[i] = true
-                        }
-                        consoleOut("lists " + 0 + " through " + (count - 1) + " hidden")
-                    }
-                    else
-                    {
-                        id = args[2]
-                        lsitDisabled[id] = true
-                        consoleOut("list " + id + " hidden")
-                    }
-                    break
-                
-                case "tex" :
-                    if (args[2] == "all")
-                    {
-                        toggleAllTextures(false)
-                        consoleOut("textures " + 1 + " through " + (count) + " hidden")
-                    }
-                    else
-                    {
-                        id = args[2]
-                        texturesShown[id] = false
-                        consoleOut("texture " + id + " hidden")
-                    }
-                    break
-                
-                case "texlist" :
-                    if (args[2] == "all")
-                    {
-                        toggleAllTextures(false)
-                        consoleOut("textures " + 1 + " through " + (count) + " hidden")
-                    }
-                    else
-                    {
-                        var listid:int = args[2]
-                        toggleTexturesForList(listid, false)
-                    }
-                break
-                
-                default:
-                    consoleOut("Unknown hide target " + args[1] + ", try [list, texture, or txtlist]")
-            }
-        }
-
-        private function processShowCommand(args:Array):void
-        {
-            var i:int
-            var id:int
-            switch (args[1])
-            {
-                case "list" :
-                    if (args[2] == "all")
-                    {
-                        var count:int = this.commandLists.length - 1
-                        for (i = 0; i < count; i++)
-                        {
-                            lsitDisabled[i] = false
-                        }
-                        consoleOut("lists " + 0 + " through " + (count - 1) + " shown")
-                    }
-                    else
-                    {
-                        id = args[2]
-                        lsitDisabled[id] = false
-                        consoleOut("list " + id + " shown")
-                    }
-                    break
-                case "tex" :
-                    if (args[2] == "all")
-                    {
-                        toggleAllTextures(true)
-                        consoleOut("textures " + 1 + " through " + (count) + " shown")
-                    }
-                    else
-                    {
-                        id = args[2]
-                        texturesShown[id] = true
-                        consoleOut("texture " + id + " shown")
-                    }
-                    break
-                
-                case "texlist" :
-                    if (args[2] == "all")
-                    {
-                        toggleAllTextures(true)
-                        consoleOut("textures " + 1 + " through " + (count) + " shown")
-                    }
-                    else
-                    {
-                        var listid:int = args[2]
-                        toggleTexturesForList(listid, true)
-                    }
-                    break
-                
-                default:
-                    consoleOut("Unknown show target " + args[1] + ", try [list, texture, or txtlist]")
-            }
-        }
-
-        public function showConsole(show:Boolean):void
-        {
-            if (!debugUI)
-                createDebugUI()
-
-            if (show && debugUI.parent == null)
-            {
-                _stage.addChildAt(debugUI, 0)
-                debugUI.y = _stage.stageHeight - debugUI.height
-                debugUI.x = _stage.stageWidth - debugUI.width
-                _stage.focus = consoleInput
-            }
-            else if (!show && debugUI.parent != null)
-            {
-                _stage.removeChild(debugUI)
-                _stage.focus = _stage
-            }
-        }
-        
-        public function get consoleOn():Boolean
-        {
-            return debugUI != null && debugUI.parent != null
-        }
-        
-        // -------------------------------------------------------------------
-        
-
-        private static var _instance:GLAPI
-        
         public static function init(context:Context3D, log:Object, stage:Stage):void
         {
             _instance = new GLAPI(context, log, stage)
@@ -508,35 +189,6 @@ package Stage3DGL
             if (log)
                 log.send(value)
         }
-        
-        private var activeCommandList:CommandList = null
-        private var commandLists:Vector.<CommandList> = null
-        private var vbb:VertexBufferBuilder
-        
-        private function perspectiveProjection(fov:Number = 90,
-                                                 aspect:Number = 1, 
-                                                 near:Number = 1, 
-                                                 far:Number = 2048):Matrix3D
-        {
-            var y2:Number = near * Math.tan(fov * Math.PI / 360)
-            var y1:Number = -y2
-            var x1:Number = y1 * aspect
-            var x2:Number = y2 * aspect
-            
-            var a:Number = 2 * near / (x2 - x1)
-            var b:Number = 2 * near / (y2 - y1)
-            var c:Number = (x2 + x1) / (x2 - x1)
-            var d:Number = (y2 + y1) / (y2 - y1)
-            var q:Number = -(far + near) / (far - near)
-            var qn:Number = -2 * (far * near) / (far - near)
-            
-            return new Matrix3D(Vector.<Number>([
-                a, 0, 0, 0,
-                0, b, 0, 0,
-                c, d, q, -1,
-                0, 0, qn, 0
-            ]))
-        }
 
         private function matrix3DToString(m:Matrix3D):String
         {
@@ -550,17 +202,7 @@ package Stage3DGL
         // ======================================================================
         //  Polygon Offset
         // ----------------------------------------------------------------------
-        
-        /* polygon_offset */
-        public static const GL_POLYGON_OFFSET_FACTOR:uint = 0x8038
-        public static const GL_POLYGON_OFFSET_UNITS :uint = 0x2A00
-        public static const GL_POLYGON_OFFSET_POINT :uint = 0x2A01
-        public static const GL_POLYGON_OFFSET_LINE  :uint = 0x2A02
-        public static const GL_POLYGON_OFFSET_FILL  :uint = 0x8037
-        
-        private var offsetFactor:Number = 0.0
-        private var offsetUnits:Number = 0.0
-            
+ 
         public function glPolygonMode(face:uint, mode:uint):void
         {
             switch(mode)
@@ -604,72 +246,6 @@ package Stage3DGL
         {
             //TODO: fixme
         }
-        
-        // ======================================================================
-        //  Lighting and Materials
-        // ----------------------------------------------------------------------  
-        
-        public static const GL_LIGHTING                   :uint = 0x0B50
-        public static const GL_LIGHT_MODEL_LOCAL_VIEWER   :uint = 0x0B51
-        public static const GL_LIGHT_MODEL_TWO_SIDE       :uint = 0x0B52
-        public static const GL_LIGHT_MODEL_AMBIENT        :uint = 0x0B53
-        public static const GL_SHADE_MODEL                :uint = 0x0B54
-        public static const GL_COLOR_MATERIAL_FACE        :uint = 0x0B55
-        public static const GL_COLOR_MATERIAL_PARAMETER   :uint = 0x0B56
-        public static const GL_COLOR_MATERIAL             :uint = 0x0B57
-        public static const GL_MODELVIEW_MATRIX           :uint = 0x0BA6
-        
-        /* LightName */
-        public static const GL_LIGHT0:uint = 0x4000
-        public static const GL_LIGHT1:uint = 0x4001
-        public static const GL_LIGHT2:uint = 0x4002
-        public static const GL_LIGHT3:uint = 0x4003
-        public static const GL_LIGHT4:uint = 0x4004
-        public static const GL_LIGHT5:uint = 0x4005
-        public static const GL_LIGHT6:uint = 0x4006
-        public static const GL_LIGHT7:uint = 0x4007
-        
-        /* LightParameter */
-        public static const GL_AMBIENT               :uint =  0x1200
-        public static const GL_DIFFUSE               :uint =  0x1201
-        public static const GL_SPECULAR              :uint =  0x1202
-        public static const GL_POSITION              :uint =  0x1203
-        public static const GL_SPOT_DIRECTION        :uint =  0x1204
-        public static const GL_SPOT_EXPONENT         :uint =  0x1205
-        public static const GL_SPOT_CUTOFF           :uint =  0x1206
-        public static const GL_CONSTANT_ATTENUATION  :uint =  0x1207
-        public static const GL_LINEAR_ATTENUATION    :uint =  0x1208
-        public static const GL_QUADRATIC_ATTENUATION :uint =  0x1209
-            
-        /* MaterialParameter */
-        public static const GL_EMISSION                :uint = 0x1600
-        public static const GL_SHININESS               :uint = 0x1601
-        public static const GL_AMBIENT_AND_DIFFUSE     :uint = 0x1602
-        public static const GL_COLOR_INDEXES           :uint = 0x1603
-            
-        /* Polygon Modes */
-        public static const GL_POINT                   :uint = 0x1B00
-        public static const GL_LINE                    :uint = 0x1B01
-        public static const GL_PFILL                   :uint = 0x1B02
-        
-        /* Shading model */
-        public static const GL_FLAT                     :uint = 0x1D00
-        public static const GL_SMOOTH                   :uint = 0x1D01 
-            
-        /* separate_specular_color */
-        public static const GL_LIGHT_MODEL_COLOR_CONTROL :uint = 0x81F8
-        public static const GL_SINGLE_COLOR              :uint = 0x81F9
-        public static const GL_SEPARATE_SPECULAR_COLOR   :uint = 0x81FA
-
-        /* Texture Env Modes */
-        public static const GL_MODULATE:uint = 0x2100
-        public static const GL_NEAREST:uint = 0x2600
-        public static const GL_LINEAR:uint = 0x2601
-        public static const GL_NEAREST_MIPMAP_LINEAR:uint = 0x2702
-        public static const GL_TEXTURE_ENV_MODE:uint = 0x2200
-        
-        /* Make sure to initialize to default values here. */
-        private var contextMaterial:Material = new Material(true)
             
         private function setVector(vec:Vector.<Number>, x:Number, y:Number, z:Number, w:Number):void
         {
@@ -748,8 +324,7 @@ package Stage3DGL
                     if (log) log.send("[NOTE] Unsupported glMaterial call with 0x" + pname.toString(16))
             }
         }
-        
-        
+
         public function glLightModeli(pname:uint, param:int):void
         {
             switch (pname)
@@ -772,10 +347,7 @@ package Stage3DGL
             
             if (log) log.send("glLightModeli() not yet implemented")
         }
-        
-        private var lights:Vector.<Light> = new Vector.<Light>(8)
-        private var lightsEnabled:Vector.<Boolean> = new Vector.<Boolean>(8)
-        
+
         public function glLight(light:uint, pname:uint, r:Number, g:Number, b:Number, a:Number):void
         {
             var lightIndex:int = light - GL_LIGHT0
@@ -822,9 +394,6 @@ package Stage3DGL
                     break
             }
         }
-            
-        public static const GL_MAX_TEXTURE_SIZE:uint =          0x0D33
-        public static const GL_VIEWPORT:uint =                  0x0BA2
 
         public function glGetIntegerv(pname:uint, buf:ByteArray, offset:uint):void
         {
@@ -863,19 +432,7 @@ package Stage3DGL
                     if (log) log.send("[NOTE] Unsupported glGetFloatv call with 0x" + pname.toString(16))
             }
         }
-
-        /* ClipPlaneName */
-        public static const GL_CLIP_PLANE0:uint = 0x3000
-        public static const GL_CLIP_PLANE1:uint = 0x3001
-        public static const GL_CLIP_PLANE2:uint = 0x3002
-        public static const GL_CLIP_PLANE3:uint = 0x3003
-        public static const GL_CLIP_PLANE4:uint = 0x3004
-        public static const GL_CLIP_PLANE5:uint = 0x3005
-        
-        private var clipPlanes:Vector.<Number> = new Vector.<Number>(6 * 4)    // space for 6 clip planes
-        private var clipPlaneEnabled:Vector.<Boolean> = new Vector.<Boolean>(8) // defaults to false
-
-        
+       
         public function glClipPlane(plane:uint, a:Number, b:Number, c:Number, d:Number):void
         {
             if (log) log.send("[NOTE] glClipPlane called for plane 0x" + plane.toString(16) + ", with args " + a + ", " + b + ", " + c + ", " + d)
@@ -892,13 +449,6 @@ package Stage3DGL
             clipPlanes[ index * 4 + 2 ] = result.z
             clipPlanes[ index * 4 + 3 ] = a * m.rawData[3] + b * m.rawData[7] + c * m.rawData[11] + d * m.rawData[15] //result.w
         }
-
-        private const consts:Vector.<Number> = new <Number>[0.0, 0.5, 1.0, 2.0]
-        private const zeroes:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
-        private var shininessVec:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
-        private var globalAmbient:Vector.<Number> = new <Number>[0.2, 0.2, 0.2, 1]
-        
-        private var polygonOffsetValue:Number = -0.0005
 
         private function executeCommandList(cl:CommandList):void
         {
@@ -1081,8 +631,6 @@ package Stage3DGL
 
                     }
 
-
-
                     // Map the Vertex buffer
                     
                     // position
@@ -1115,7 +663,6 @@ package Stage3DGL
             }
         }
 
-        //    extern GLuint glGenLists (GLsizei range)
         public function glGenLists(count:uint):uint
         {
             if (log) log.send("glGenLists " + count)
@@ -1126,25 +673,6 @@ package Stage3DGL
             commandLists.length = oldLength + count
             return oldLength
         }
-        
-        // ---------------------------------- GL MATRIX STACK ---
-        
-        private var modelViewStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
-        private var projectionStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
-        private var textureStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
-        private var currentMatrixStack:Vector.<Matrix3D> = modelViewStack
-        
-        /* MatrixMode */
-        public static const GL_MODELVIEW:uint = 0x1700
-        public static const GL_PROJECTION:uint = 0x1701
-        public static const GL_TEXTURE:uint = 0x1702
-        
-        // For Debug purposes
-        public static const MATRIX_MODE:Array = [
-            "GL_MODELVIEW",
-            "GL_PROJECTION",
-            "GL_TEXTURE",
-            ]
 
         public function glMatrixMode(mode:uint):void
         {
@@ -1257,8 +785,7 @@ package Stage3DGL
             var m:Matrix3D = new Matrix3D(v)
             currentMatrixStack[currentMatrixStack.length - 1] = m
         }
-        
-        // ------------------------------------------------------
+
         public function glDepthMask(enable:Boolean):void
         {
             if (log) log.send("glDepthMask(" + enable + "), currently contextEnableDepth = " + contextEnableDepth)
@@ -1268,32 +795,7 @@ package Stage3DGL
                 context.setDepthTest(contextDepthMask, contextDepthFunction)
             }
         }
-        
-        /* AlphaFunction */
-        /* DepthFunction */
-        /* StencilFunction */
-        public static const GL_NEVER:uint      = 0x0200
-        public static const GL_LESS:uint       = 0x0201
-        public static const GL_EQUAL:uint      = 0x0202
-        public static const GL_LEQUAL:uint     = 0x0203
-        public static const GL_GREATER:uint    = 0x0204
-        public static const GL_NOTEQUAL:uint   = 0x0205
-        public static const GL_GEQUAL:uint     = 0x0206
-        public static const GL_ALWAYS:uint     = 0x0207
-        
-        public static const COMPARE_MODE:Array = [
-            "GL_NEVER",
-            "GL_LESS",
-            "GL_EQUAL",
-            "GL_LEQUAL",
-            "GL_GREATER",
-            "GL_NOTEQUAL",
-            "GL_GEQUAL",
-            "GL_ALWAYS",
-            ]
 
-        private var contextDepthFunction:String = Context3DCompareMode.LESS
-        
         public function glDepthFunc(mode:uint):void
         {
             if (log) log.send("glDepthFunc( " + COMPARE_MODE[mode - GL_NEVER] + " ), currently contextEnableDepth = " + contextEnableDepth)
@@ -1318,49 +820,7 @@ package Stage3DGL
             }
             return null
         }
-        
-        // ------------------------------------------------------
-        
-        /* TextureCoordName */
-        public static const GL_S:uint =         0x2000
-        public static const GL_T:uint =         0x2001
-        public static const GL_R:uint =         0x2002
-        public static const GL_Q:uint =         0x2003
 
-        public static const GL_COORD_NAME:Array = [
-            "GL_S",
-            "GL_T",
-            "GL_R",
-            "GL_Q",
-        ]
-
-        /* TextureGenParameter */
-        public static const GL_TEXTURE_GEN_MODE:uint =  0x2500
-        public static const GL_OBJECT_PLANE:uint =      0x2501
-        public static const GL_EYE_PLANE:uint =         0x2502
-
-        public static const GL_PARAM_NAME:Array = [
-            "GL_TEXTURE_GEN_MODE",
-            "GL_OBJECT_PLANE",
-            "GL_EYE_PLANE",
-        ]
-
-        /* param */
-        public static const GL_EYE_LINEAR:uint =        0x2400
-        public static const GL_OBJECT_LINEAR:uint =     0x2401
-        public static const GL_SPHERE_MAP:uint =        0x2402
-        public static const GL_NORMAL_MAP:uint =        0x8511
-        public static const GL_REFLECTION_MAP:uint =    0x8512
-        
-        public static const GL_PARAM:Array = [
-            "GL_EYE_LINEAR",
-            "GL_OBJECT_LINEAR",
-            "GL_SPHERE_MAP",
-            "GL_NORMAL_MAP",
-            "GL_REFLECTION_MAP",
-        ]
-        
-        
         private function texGenParamToString(param:uint):String
         {
             if (param < GL_NORMAL_MAP)
@@ -1368,19 +828,7 @@ package Stage3DGL
             else
                 return GL_PARAM[param - GL_NORMAL_MAP]
         }
-        
-        
-        public static const GL_TEXTURE_GEN_S:uint = 0x0C60
-        public static const GL_TEXTURE_GEN_T:uint = 0x0C61
-        public static const GL_TEXTURE_GEN_R:uint = 0x0C62
-        public static const GL_TEXTURE_GEN_Q:uint = 0x0C63
-        
-        private var enableTexGenS:Boolean = false
-        private var enableTexGenT:Boolean = false
-        private var texGenParamS:uint = GL_SPHERE_MAP
-        private var texGenParamT:uint = GL_SPHERE_MAP
-        
-        
+
         public function glTexGeni(coord:uint, pname:uint, param:uint):void
         {
             if (log) log.send("glTexGeni( " + GL_COORD_NAME[coord - GL_S] + ", " + GL_PARAM_NAME[pname - GL_TEXTURE_GEN_MODE] + ", " + texGenParamToString(param) + ")")
@@ -1408,55 +856,7 @@ package Stage3DGL
                 break
             }
         }
-        
-        /* BeginMode */
-        public static const GL_POINTS:uint           = 0x0000
-        public static const GL_LINES:uint            = 0x0001
-        public static const GL_LINE_LOOP:uint        = 0x0002
-        public static const GL_LINE_STRIP:uint       = 0x0003
-        public static const GL_TRIANGLES:uint        = 0x0004
-        public static const GL_TRIANGLE_STRIP:uint   = 0x0005
-        public static const GL_TRIANGLE_FAN:uint     = 0x0006
-        public static const GL_QUADS:uint            = 0x0007
-        public static const GL_QUAD_STRIP:uint       = 0x0008
-        public static const GL_POLYGON:uint          = 0x0009
 
-        // For Debug purposes
-        public static const BEGIN_MODE:Array = [
-            "GL_POINTS",
-            "GL_LINES",
-            "GL_LINE_LOOP",
-            "GL_LINE_STRIP",
-            "GL_TRIANGLES",
-            "GL_TRIANGLE_STRIP",
-            "GL_TRIANGLE_FAN",
-            "GL_QUADS",
-            "GL_QUAD_STRIP",
-            "GL_POLYGON",
-        ]
-
-        public function glBegin(mode:uint):void
-        {
-            if (!vbb)
-            {
-                vbb = new VertexBufferBuilder()
-            }
-            vbb.reset()
-            vbb.mode = mode
-            
-            if (log) log.send("glBegin(), Mode is " + BEGIN_MODE[mode])
-        }
-
-        public function renderAllLists():void
-        {
-            for (var i:int = 0; i < commandLists.length; i++)
-            {
-                executeCommandList(commandLists[i])
-            }
-        }
-        
-        private var sharedIndexBuffers:Dictionary = new Dictionary()
-        
         private function setupIndexBuffer(stream:VertexStream, mode:uint, count:int):void
         {
             var key:uint = ((mode << 20) | count)
@@ -1574,12 +974,7 @@ package Stage3DGL
                     }
             }
         }
-        
-        private var reusableCommandList:CommandList = new CommandList()
-        private var reusableVertexBuffers:Dictionary = new Dictionary()
-        
-        private var immediateVertexBuffers:VertexBufferPool = new VertexBufferPool()
-        
+
         public function glEndVertexData(count:uint, mode:uint, data:ByteArray, dataPtr:uint, dataHash:uint, flags:uint):void
         {
             // FIXME: build an actual VertexBuffer3D
@@ -1648,9 +1043,7 @@ package Stage3DGL
                 else
                     if (log) log.send("[Warning] Unsupported glTexGen mode for GL_S: 0x" + texGenParamT.toString(16))
             }
-            
-            //stream.program = getFixedFunctionPipelineProgram(vbb.flags)
-            
+
             // Make sure that if we have any active state changes, we push them in front of the stream commands
             if (cl.activeState)
             {
@@ -1666,28 +1059,6 @@ package Stage3DGL
                 executeCommandList(cl)
             }
         }
-        
-        public function glEnd():void
-        {
-            glEndVertexData(vbb.count, vbb.mode, vbb.data, 0, VertexBufferPool.calcHash(vbb.count, vbb.data, 0), vbb.flags)
-        }
-        
-        private var glStateFlags:uint = 0
-        
-        // bit 0 = whether textures are enabled
-        private const ENABLE_TEXTURE_OFFSET:uint = 0
-        // bits 1-6 = whether clip planes 0-5 are enabled
-        private const ENABLE_CLIPPLANE_OFFSET:uint = 1
-        // bit 7 = whether color material is enabled
-        private const ENABLE_COLOR_MATERIAL_OFFSET:uint = 7
-        // bit 8 = whether lighting is enabled
-        private const ENABLE_LIGHTING_OFFSET:uint = 8
-        // bit 9-16 = whether lights 0-7 are enabled
-        private const ENABLE_LIGHT_OFFSET:uint = 9
-        // bit 17 = whether specular is separate
-        private const ENABLE_SEPSPEC_OFFSET:uint = 17
-        // bit 18 = whether polygon offset is enabled
-        private const ENABLE_POLYGON_OFFSET:uint = 18
         
         private function setGLState(bit:uint):void
         {
@@ -1726,9 +1097,7 @@ package Stage3DGL
             }
             return key
         }
-        
-        private var fixed_function_programs:Dictionary = new Dictionary()
-        
+    
         private function ensureProgramUpToDate(stream:VertexStream):void
         {
             var flags:uint = stream.vertexFlags
@@ -2165,8 +1534,7 @@ package Stage3DGL
                     // also init v4 to 0.
                     vertexShader = "mov v4.xyzw, vc16.xxxx\n" + "mov v5, vc17" + "\n" + vertexShader
                 }
-                
-                
+
                 // CLIPPING
                 var clippingOn:Boolean = clipPlaneEnabled[0] || clipPlaneEnabled[1] || clipPlaneEnabled[2] || clipPlaneEnabled[3] || clipPlaneEnabled[4] || clipPlaneEnabled[5]
                 if (clippingOn)
@@ -2234,40 +1602,8 @@ package Stage3DGL
             return p
         }
 
-        //extern void glVertex3fv (const GLfloat *v)
-        public function glVertex(x:Number, y:Number, z:Number):void
-        {
-            //vbb.pos.push(x, y, z)
-            vbb.x = x
-            vbb.y = y
-            vbb.z = z
-
-            if (log)
-            {
-                if ((vbb.flags & VertexBufferBuilder.HAS_TEXTURE2D) != 0)
-                    log.send("glVertex("+ x + ", " + y + ", " + z + ", tx = " + vbb.tx + ", ty = " + vbb.ty + ")")
-                else 
-                    log.send("glVertex("+ x + ", " + y + ", " + z + ")")
-            }
-            
-            vbb.push()
-        }
-        
-        private var contextColor:Vector.<Number> = new <Number>[1, 1, 1, 1]
-        
         public function glColor(r:Number, g:Number, b:Number, alpha:Number):void
         {
-            //if (log) log.send("glColor")
-
-            if (vbb)
-            {
-                vbb.r = r
-                vbb.g = g
-                vbb.b = b
-                vbb.a = alpha
-                vbb.flags |= VertexBufferBuilder.HAS_COLOR
-            }
-        
             // Change current color if we're not recording a command
             if (!activeCommandList)
             {
@@ -2276,32 +1612,8 @@ package Stage3DGL
                 contextColor[2] = b                
                 contextColor[3] = alpha                
             }
-            
-            //if (alpha < 1)
-            //    if (log) log.send("Color: " + r + ", " + g + ", " + b + ", " + alpha) 
-        }
-        
-        public function glTexCoord(x:Number, y:Number):void
-        {
-            if (log) log.send("glTexCoord")
-            vbb.tx = x
-            vbb.ty = y
-            vbb.flags |= VertexBufferBuilder.HAS_TEXTURE2D
-        }
-        
-        public function glNormal(x:Number, y:Number, z:Number):void
-        {
-            if (log) log.send("glNormal")
-            vbb.nx = x
-            vbb.ny = y
-            vbb.nz = z
-            vbb.flags |= VertexBufferBuilder.HAS_NORMAL
         }
 
-        /* ListMode */
-        public static const GL_COMPILE:uint = 0x1300
-        public static const GL_COMPILE_AND_EXECUTE:uint = 0x1301
-        
         public function glNewList(id:uint, mode:uint):void
         {
             // Allocate and active a new CommandList
@@ -2310,8 +1622,7 @@ package Stage3DGL
             activeCommandList.executeOnCompile = (mode == GL_COMPILE_AND_EXECUTE)
             commandLists[id] = activeCommandList
         }
-        
-        //extern void glEndList (void)
+    
         public function glEndList():void
         {
             // Make sure if we have any pending state changes, we push them as a command at the end of the list
@@ -2327,225 +1638,32 @@ package Stage3DGL
             // We're done with this list, it's no longer active
             activeCommandList = null
         }
-        
-        //extern void glCallList (GLuint list)
+
         public function glCallList(id:uint):void
         {
             if (log) log.send("glCallList")
             if (activeCommandList)
                 if (log) log.send("Warning: Calling a command list while building a command list not yet implemented.")
             
-            if (!lsitDisabled[id])
-            {
-                if (log) log.send("Rendering List " + id)
-                executeCommandList(commandLists[id])
-            }
-            else
-                if (log) log.send("skipping list " + id)
+            if (log) log.send("Rendering List " + id)
+            executeCommandList(commandLists[id])
         }
-
-        
-        // ======================================================================
-        //  Properties
-        // ----------------------------------------------------------------------
-        
-        public var log:Object = null; // new TraceLog();
-        public var context:Context3D
-        private var contextWidth:int = 0
-        private var contextHeight:int = 0
-        private var contextAA:int = 0
-        private var contextClearR:Number
-        private var contextClearG:Number
-        private var contextClearB:Number
-        private var contextClearA:Number
-        private var contextClearDepth:Number = 1.0
-        private var contextClearStencil:uint = 0
-        private var contextClearMask:uint
-        private var contextEnableStencil:Boolean = false
-        private var contextEnableAlphaTest:Boolean = false
-
-        private var contextStencilActionStencilFail:String = Context3DStencilAction.KEEP
-        private var contextStencilActionDepthFail:String = Context3DStencilAction.KEEP
-        private var contextStencilActionPass:String = Context3DStencilAction.KEEP
-        private var contextStencilCompareMode:String = Context3DCompareMode.ALWAYS
-
-        private var contextEnableDepth:Boolean = true
-        private var contextDepthMask:Boolean = true
-        private var contextSrcBlendFunc:String = Context3DBlendFactor.ZERO
-        private var contextDstBlendFunc:String = Context3DBlendFactor.ONE
-        private var contextEnableCulling:Boolean
-        private var contextEnableBlending:Boolean
-//        private var contextFrontFace:uint = GL_CCW
-        private var contextDepthFunc:String = Context3DCompareMode.ALWAYS
-        private var contextEnableTextures:Boolean = false
-        private var contextEnableLighting:Boolean = false
-        private var contextColorMaterial:Boolean = false
-        private var contextSeparateSpecular:Boolean = false
-        private var contextEnablePolygonOffset:Boolean = false
-        
-        private var needClear:Boolean = true
-        private var vertexAttributesDirty:Boolean = true
-        //private var macroAssembler:AGALMacroAssembler
-        
-        private var dataBuffers:Dictionary = new Dictionary()
-        private var frameBuffers:Dictionary = new Dictionary()
-        private var renderBuffers:Dictionary = new Dictionary()
-        private var programs:Dictionary = new Dictionary()
-        private var shaders:Dictionary = new Dictionary()
-        private var textures:Dictionary = new Dictionary()
-        private var vertexBufferAttributes:Vector.<VertexBufferAttribute> = new Vector.<VertexBufferAttribute>(8)
-        private var textureUnits:Array = new Array(32)
-        public var activeProgram:ProgramInstance
-        private var activeTextureUnit:uint = 0
-        private var activeArrayBuffer:DataBuffer
-        private var activeElementBuffer:DataBuffer
-        private var pendingFrameBuffer:FrameBuffer
-        private var activeFrameBuffer:FrameBuffer
-        private var activeRenderBuffer:RenderBuffer
-
-        // FIXME (egeorgie): Single activeTexture of type TextureInstance or just id to the istance?
-//        private var active2DTexture:TextureParams
-//        private var activeCubeTexture:TextureParams
-        private var activeTexture:TextureInstance
-
-        private var textureSamplers:Vector.<TextureInstance> = new Vector.<TextureInstance>(8)
-        private var textureSamplerIDs:Vector.<uint> = new Vector.<uint>(8)
-
-        private var framestamp:uint = 1
-        private var vertexBufferPool:Dictionary = new Dictionary()
-        private var indexBufferPool:Dictionary = new Dictionary()
-        private var squentialTripStripIndexBufferPool:Dictionary = new Dictionary()
-        
-        public var dumpShaderCode:Boolean = false
-
-        public var genOnBind:Boolean = false
-
-    //public var counts:Dictionary = new Dictionary()
-
-        // ======================================================================
-        //  Constants
-        // ----------------------------------------------------------------------       
-        public static const GL_DEPTH_BUFFER_BIT:uint    = 0x00000100
-        public static const GL_STENCIL_BUFFER_BIT:uint = 0x00000400
-        public static const GL_COLOR_BUFFER_BIT:uint    = 0x00004000
-        
-        public static const GL_ALPHA_TEST:uint      = 0x0BC0
-        public static const GL_DITHER:uint          = 0x0BD0
-        public static const GL_BLEND:uint           = 0x0BE2
-        public static const GL_STENCIL_TEST:uint    = 0x0B90
-        public static const GL_SCISSOR_TEST:uint    = 0x0C11
-        public static const GL_DEPTH_TEST:uint      = 0x0B71
-        public static const GL_CULL_FACE:uint       = 0x0B44
-        public static const GL_NORMALIZE:uint       = 0x0BA1
-        
-//        public static const GL_CW:uint  = 0x0900
-//        public static const GL_CCW:uint = 0x0901
-        
-//        public static const GL_NEVER:uint       = 0x0200
-//        public static const GL_LESS:uint        = 0x0201
-//        public static const GL_EQUAL:uint       = 0x0202
-//        public static const GL_LEQUAL:uint      = 0x0203
-//        public static const GL_GREATER:uint     = 0x0204
-//        public static const GL_NOTEQUAL:uint    = 0x0205
-//        public static const GL_GEQUAL:uint      = 0x0206
-//        public static const GL_ALWAYS:uint      = 0x0207
-        
-        public static const GL_ZERO:uint                    = 0x0
-        public static const GL_ONE:uint                     = 0x1
-        public static const GL_SRC_COLOR:uint               = 0x0300
-        public static const GL_ONE_MINUS_SRC_COLOR:uint     = 0x0301
-        public static const GL_SRC_ALPHA:uint               = 0x0302
-        public static const GL_ONE_MINUS_SRC_ALPHA:uint     = 0x0303
-        public static const GL_DST_ALPHA:uint               = 0x0304
-        public static const GL_ONE_MINUS_DST_ALPHA:uint     = 0x0305
-        public static const GL_DST_COLOR:uint                = 0x0306
-        public static const GL_ONE_MINUS_DST_COLOR:uint        = 0x0307
-        public static const GL_FUNC_ADD:uint                = 0x8006
-        
-        public static const GL_TEXTURE0:uint                    = 0x84C0
-        public static const GL_ACTIVE_TEXTURE:uint              = 0x84E0
-        public static const GL_TEXTURE_2D:uint                  = 0x0DE1
-        public static const GL_TEXTURE_CUBE_MAP:uint            = 0x8513
-        public static const GL_TEXTURE_MAX_ANISOTROPY_EXT:uint  = 0x84FE
-        public static const GL_TEXTURE_MAG_FILTER:uint          = 0x2800
-        public static const GL_TEXTURE_MIN_FILTER:uint          = 0x2801
-
-        public static const GL_TEXTURE_MIN_LOD:uint          = 0x813A
-        public static const GL_TEXTURE_MAX_LOD:uint          = 0x813B
-        
-        public static const GL_TEXTURE_CUBE_MAP_POSITIVE_X:uint    = 0x8515
-        public static const GL_TEXTURE_CUBE_MAP_NEGATIVE_X:uint    = 0x8516
-        public static const GL_TEXTURE_CUBE_MAP_POSITIVE_Y:uint    = 0x8517
-        public static const GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:uint    = 0x8518
-        public static const GL_TEXTURE_CUBE_MAP_POSITIVE_Z:uint    = 0x8519
-        public static const GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:uint    = 0x851A
-        public static const GL_LUMINANCE:uint                      = 0x1909
-        
-        public static const GL_ARRAY_BUFFER:uint            = 0x8892
-        public static const GL_ELEMENT_ARRAY_BUFFER:uint    = 0x8893
-        
-        public static const GL_STREAM_DRAW:uint   = 0x88E0
-        public static const GL_STATIC_DRAW:uint   = 0x88E4
-        public static const GL_DYNAMIC_DRAW:uint  = 0x88E8
-        
-        public static const GL_FRAGMENT_SHADER:uint  = 0x8B30
-        public static const GL_VERTEX_SHADER:uint    = 0x8B31
-        
-        public static const GL_UNSIGNED_BYTE:uint   = 0x1401
-        public static const GL_UNSIGNED_SHORT:uint  = 0x1403
-        public static const GL_FLOAT:uint           = 0x1406
-        
-        public static const CDATA_FLOAT1:uint        = 1
-        public static const CDATA_FLOAT2:uint        = 2
-        public static const CDATA_FLOAT3:uint        = 3
-        public static const CDATA_FLOAT4:uint        = 4
-        public static const CDATA_MATRIX4x4:uint     = 16
-        
-        public static const GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG:uint = 0x83F0
-                
-        // ----------------------------------------------------------------------
-        //
-        //  Constructor
-        //
-        // ----------------------------------------------------------------------
 
         public function GLAPI(context:Context3D, log:Object, stage:Stage):void
         {
             // For the debug console
             _stage = stage
-            _stage.addEventListener(KeyboardEvent.KEY_DOWN, keyDown_handler, false, 0)
-            
+
             //this.log = new TraceLog()
             this.context = context
-            indexBufferCache = acquireBufferFromPool(65536, 0, GL_ELEMENT_ARRAY_BUFFER)
-            indexBufferCache.indicesSize = GL_UNSIGNED_SHORT
-
-            for (var i:int = 0; i < 65536; i++)
-                indexBufferCache.data.writeShort(i)
-            indexBufferCache.size = 65536
-            uploadBuffer(indexBufferCache)
-
-            indexBufferQuadCache.endian = "littleEndian"
-            indexBufferQuadCache.writeShort(0)
-            indexBufferQuadCache.writeShort(1)
-            indexBufferQuadCache.writeShort(2)
-            indexBufferQuadCache.writeShort(2)
-            indexBufferQuadCache.writeShort(1)
-            indexBufferQuadCache.writeShort(3)
         }
-        
-        // ----------------------------------------------------------------------
-        //
-        //  Methods
-        //
-        // ----------------------------------------------------------------------
-        
+
         public function glClear(mask:uint):void
         {
             if (log) log.send( "glClear called with " + mask)
 
             // trace("validateFramebufferState from glClear")
-            validateFramebufferState(false)
+            //validateFramebufferState(false)
 
             contextClearMask = 0
             if (mask & GL_COLOR_BUFFER_BIT) contextClearMask |= Context3DClearMask.COLOR
@@ -2564,11 +1682,11 @@ package Stage3DGL
             }
 
             // If this is a render texture, keep track of the last frame it was cleared
-            if (activeFrameBuffer != null)
+            /*if (activeFrameBuffer != null)
             {
                 // trace( "    clear targeted an offscreen texture")
                 activeFrameBuffer.lastClearFramestamp = framestamp
-            }
+            }*/
 
             // Make sure the vertex buffer pool knows it's next frame already to enable recycling
             immediateVertexBuffers.nextFrame()
@@ -2584,11 +1702,6 @@ package Stage3DGL
             contextClearA = alpha
         }
         
-        public function glFinish():void
-        {
-            // log.send( "[STUBBED] glFinish\n")
-        }
-        
         public function glActiveTexture(index:uint):void
         {
             var unitIndex:uint = index - GL_TEXTURE0
@@ -2598,11 +1711,6 @@ package Stage3DGL
             } else {
                 // log.send( "[NOTE] Invalid texture unit requested " + uint)
             }
-        }
-        
-        public function glFlush():void
-        {
-            // log.send( "[STUBBED] glFlush\n")
         }
         
         public function glBindTexture(type:uint, texture:uint):void
@@ -2642,16 +1750,6 @@ package Stage3DGL
                 if (log) log.send( "[NOTE] Unsupported texture type " + type + " for glBindTexture")
             }
         }
-        
-        
-        //void glCullFace(GLenum  mode)
-        /* CullFaceMode */
-        /*      GL_FRONT */
-        /*      GL_BACK */
-        /*      GL_FRONT_AND_BACK */
-        public static const GL_FRONT:uint =             0x0404
-        public static const GL_BACK:uint =              0x0405
-        public static const GL_FRONT_AND_BACK:uint =    0x0408
 
         private function glCullModeToContext3DTriangleFace(mode:uint, frontFaceClockWise:Boolean):String
         {
@@ -2684,17 +1782,7 @@ package Stage3DGL
             if (contextEnableCulling)
                 context.setCulling(disableCulling ? Context3DTriangleFace.NONE: glCullModeToContext3DTriangleFace(glCullMode, frontFaceClockWise))         
         }
-        
-        
-        /* FrontFaceDirection */
-        public static const GL_CW:uint =    0x0900
-        public static const GL_CCW:uint =   0x0901
 
-        
-        // Initial value
-        private var frontFaceClockWise:Boolean = false // we default to CCW
-        private var glCullMode:uint = GL_BACK
-        
         public function glFrontFace(mode:uint):void
         {
             if (log) log.send("glFrontFace")
@@ -2922,56 +2010,6 @@ package Stage3DGL
             }
         }
 
-        
-        /* AttribMask */
-        public static const GL_CURRENT_BIT:uint =                    0x00000001
-        public static const GL_POINT_BIT:uint =                      0x00000002
-        public static const GL_LINE_BIT:uint =                       0x00000004
-        public static const GL_POLYGON_BIT:uint =                    0x00000008
-        public static const GL_POLYGON_STIPPLE_BIT:uint =            0x00000010
-        public static const GL_PIXEL_MODE_BIT:uint =                 0x00000020
-        public static const GL_LIGHTING_BIT:uint =                   0x00000040
-        public static const GL_FOG_BIT:uint =                        0x00000080
-//        public static const GL_DEPTH_BUFFER_BIT:uint =               0x00000100
-        public static const GL_ACCUM_BUFFER_BIT:uint =               0x00000200
-//        public static const GL_STENCIL_BUFFER_BIT:uint =             0x00000400
-        public static const GL_VIEWPORT_BIT:uint =                   0x00000800
-        public static const GL_TRANSFORM_BIT:uint =                  0x00001000
-        public static const GL_ENABLE_BIT:uint =                     0x00002000
-//        public static const GL_COLOR_BUFFER_BIT:uint =               0x00004000
-        public static const GL_HINT_BIT:uint =                       0x00008000
-        public static const GL_EVAL_BIT:uint =                       0x00010000
-        public static const GL_LIST_BIT:uint =                       0x00020000
-        public static const GL_TEXTURE_BIT:uint =                    0x00040000
-        public static const GL_SCISSOR_BIT:uint =                    0x00080000
-        public static const GL_ALL_ATTRIB_BITS:uint =                0x000fffff
-
-        
-        private static const GL_ATTRIB_BIT:Vector.<String> = new <String>[
-            "GL_CURRENT_BIT",
-            "GL_POINT_BIT",
-            "GL_LINE_BIT",
-            "GL_POLYGON_BIT",
-            "GL_POLYGON_STIPPLE_BIT",
-            "GL_PIXEL_MODE_BIT",
-            "GL_LIGHTING_BIT",
-            "GL_FOG_BIT",
-            "GL_DEPTH_BUFFER_BIT",
-            "GL_ACCUM_BUFFER_BIT",
-            "GL_STENCIL_BUFFER_BIT",
-            "GL_VIEWPORT_BIT",
-            "GL_TRANSFORM_BIT",
-            "GL_ENABLE_BIT",
-            "GL_COLOR_BUFFER_BIT",
-            "GL_HINT_BIT",
-            "GL_EVAL_BIT",
-            "GL_LIST_BIT",
-            "GL_TEXTURE_BIT",
-            "GL_SCISSOR_BIT",
-            //"GL_ALL_ATTRIB_BITS",
-        ]
-        
-        
         public function glPushAttrib(mask:uint):void
         {
             if (log) log.send("glPushAttrib + 0x" + mask.toString(16))
@@ -2996,9 +2034,7 @@ package Stage3DGL
             // only lighting state for now.
             popCurrentLightingState()         
         }
-        
-        private var lightingStates:Vector.<LightingState> = new Vector.<LightingState>()
-        
+
         private function pushCurrentLightingState():void
         {
             var lState:LightingState = new LightingState()
@@ -3029,18 +2065,6 @@ package Stage3DGL
             this.contextMaterial = lState.contextMaterial
         }
 
-        // pname
-        public static const GL_TEXTURE_WRAP_S:uint = 0x2802
-        public static const GL_TEXTURE_WRAP_T:uint = 0x2803
-        
-        // param
-        //GL_CLAMP, GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_MIRRORED_REPEAT, GL_REPEAT
-        public static const GL_CLAMP:uint               = 0x2900
-        public static const GL_REPEAT:uint              = 0x2901
-        public static const GL_CLAMP_TO_EDGE:uint       = 0x812F
-        public static const GL_CLAMP_TO_BORDER:uint     = 0x812D
-        public static const GL_MIRRORED_REPEAT:uint     = 0x8370
-
         public function glTexEnvf(target:uint, pname:uint, param:Number):void
         {
             if (!activeTexture)
@@ -3050,7 +2074,7 @@ package Stage3DGL
             }
 
             var textureParams:TextureParams = activeTexture.params
-if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname + ", " + param)
+            if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname + ", " + param)
             switch(pname)
             {
                 case GL_TEXTURE_ENV_MODE:
@@ -3134,128 +2158,6 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             }
         }
         
-        
-        /* texture */
-        // internalFormat
-//        #define GL_ALPHA4                         0x803B
-//        #define GL_ALPHA8                         0x803C
-//        #define GL_ALPHA12                        0x803D
-//        #define GL_ALPHA16                        0x803E
-//        #define GL_LUMINANCE4                     0x803F
-//        #define GL_LUMINANCE8                     0x8040
-//        #define GL_LUMINANCE12                    0x8041
-//        #define GL_LUMINANCE16                    0x8042
-//        #define GL_LUMINANCE4_ALPHA4              0x8043
-//        #define GL_LUMINANCE6_ALPHA2              0x8044
-//        #define GL_LUMINANCE8_ALPHA8              0x8045
-//        #define GL_LUMINANCE12_ALPHA4             0x8046
-//        #define GL_LUMINANCE12_ALPHA12            0x8047
-//        #define GL_LUMINANCE16_ALPHA16            0x8048
-//        #define GL_INTENSITY                      0x8049
-//        #define GL_INTENSITY4                     0x804A
-//        #define GL_INTENSITY8                     0x804B
-//        #define GL_INTENSITY12                    0x804C
-//        #define GL_INTENSITY16                    0x804D
-//        #define GL_R3_G3_B2                       0x2A10
-//        #define GL_RGB4                           0x804F
-//        #define GL_RGB5                           0x8050
-//        #define GL_RGB8                           0x8051
-//        #define GL_RGB10                          0x8052
-//        #define GL_RGB12                          0x8053
-//        #define GL_RGB16                          0x8054
-//        #define GL_RGBA2                          0x8055
-//        #define GL_RGBA4                          0x8056
-//        #define GL_RGB5_A1                        0x8057
-//        #define GL_RGBA8                          0x8058
-//        #define GL_RGB10_A2                       0x8059
-//        #define GL_RGBA12                         0x805A
-//        #define GL_RGBA16                         0x805B
-//        #define GL_TEXTURE_RED_SIZE               0x805C
-//        #define GL_TEXTURE_GREEN_SIZE             0x805D
-//        #define GL_TEXTURE_BLUE_SIZE              0x805E
-//        #define GL_TEXTURE_ALPHA_SIZE             0x805F
-//        #define GL_TEXTURE_LUMINANCE_SIZE         0x8060
-//        #define GL_TEXTURE_INTENSITY_SIZE         0x8061
-//        #define GL_PROXY_TEXTURE_1D               0x8063
-//        #define GL_PROXY_TEXTURE_2D               0x8064
-
-        
-        /* PixelFormat */
-        // format 
-        public static const GL_COLOR_INDEX:uint =                    0x1900
-        public static const GL_STENCIL_INDEX:uint =                  0x1901
-        public static const GL_DEPTH_COMPONENT:uint =                0x1902
-        public static const GL_RED:uint =                            0x1903
-        public static const GL_GREEN:uint =                          0x1904
-        public static const GL_BLUE:uint =                           0x1905
-        public static const GL_ALPHA:uint =                          0x1906
-        public static const GL_RGB:uint =                            0x1907
-        public static const GL_RGBA:uint =                           0x1908
-//        public static const GL_LUMINANCE:uint =                      0x1909
-        public static const GL_LUMINANCE_ALPHA:uint =                0x190A
-        
-        private static const PIXEL_FORMAT:Array = [
-            "GL_COLOR_INDEX",
-            "GL_STENCIL_INDEX",
-            "GL_DEPTH_COMPONENT",
-            "GL_RED",
-            "GL_GREEN",
-            "GL_BLUE",
-            "GL_ALPHA",
-            "GL_RGB",
-            "GL_RGBA",
-        ]
-        
-        /* PixelType */
-        // imgType
-        public static const GL_BITMAP:uint =                         0x1A00
-        public static const GL_BYTE:uint =                           0x1400
-//        public static const GL_UNSIGNED_BYTE:uint =                  0x1401
-        public static const GL_SHORT:uint =                          0x1402
-//        public static const GL_UNSIGNED_SHORT:uint =                 0x1403
-        public static const GL_INT:uint =                            0x1404
-        public static const GL_UNSIGNED_INT:uint =                   0x1405
-//        public static const GL_FLOAT:uint =                          0x1406
-        public static const GL_BGR:uint =                            0x80E0
-        public static const GL_BGRA:uint =                           0x80E1
-        public static const GL_UNSIGNED_BYTE_3_3_2:uint =            0x8032
-        public static const GL_UNSIGNED_SHORT_4_4_4_4:uint =         0x8033
-        public static const GL_UNSIGNED_SHORT_5_5_5_1:uint =         0x8034
-        public static const GL_UNSIGNED_INT_8_8_8_8:uint =           0x8035
-        public static const GL_UNSIGNED_INT_10_10_10_2:uint =        0x8036
-        public static const GL_UNSIGNED_BYTE_2_3_3_REV:uint =        0x8362
-        public static const GL_UNSIGNED_SHORT_5_6_5:uint =           0x8363
-        public static const GL_UNSIGNED_SHORT_5_6_5_REV:uint =       0x8364
-        public static const GL_UNSIGNED_SHORT_4_4_4_4_REV:uint =     0x8365
-        public static const GL_UNSIGNED_SHORT_1_5_5_5_REV:uint =     0x8366
-        public static const GL_UNSIGNED_INT_8_8_8_8_REV:uint =       0x8367
-        public static const GL_UNSIGNED_INT_2_10_10_10_REV:uint =    0x8368
-        
-        private static const PIXEL_TYPE:Array = [
-            "GL_BITMAP",
-            "GL_BYTE",
-            "GL_UNSIGNED_BYTE",
-            "GL_SHORT",
-            "GL_UNSIGNED_SHORT",
-            "GL_INT",
-            "GL_UNSIGNED_INT",
-            "GL_FLOAT",
-            "GL_BGR",
-            "GL_BGRA",
-            "GL_UNSIGNED_BYTE_3_3_2",
-            "GL_UNSIGNED_SHORT_4_4_4_4",
-            "GL_UNSIGNED_SHORT_5_5_5_1",
-            "GL_UNSIGNED_INT_8_8_8_8",
-            "GL_UNSIGNED_INT_10_10_10_2",
-            "GL_UNSIGNED_BYTE_2_3_3_REV",
-            "GL_UNSIGNED_SHORT_5_6_5",
-            "GL_UNSIGNED_SHORT_5_6_5_REV",
-            "GL_UNSIGNED_SHORT_4_4_4_4_REV",
-            "GL_UNSIGNED_SHORT_1_5_5_5_REV",
-            "GL_UNSIGNED_INT_8_8_8_8_REV",
-            "GL_UNSIGNED_INT_2_10_10_10_REV",
-        ]
-        
         private function pixelTypeToString(type:uint):String
         {
             if (type == GL_BITMAP)
@@ -3267,8 +2169,7 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             else
                 return PIXEL_TYPE[type - GL_UNSIGNED_BYTE_3_3_2]
         }
-        
-        
+
         private function convertPixelDataToBGRA(width:int, height:int, srcFormat:uint, src:ByteArray, srcOffset:uint):ByteArray
         {
             //var srcBytesPerPixel:int
@@ -3319,10 +2220,8 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             return dst
         }
 
-
         public function glTexSubImage2D(target:uint, level:int, xoff:int, yoff:int, width:int, height:int, format:uint, imgType:uint, ptr:uint, ram:ByteArray):void
         {
-            
             if (log) log.send( "glTexSubImage2D " + target + " l:" + level + " " + xoff + " " + yoff + " " + width + "x" + height +  
                       PIXEL_FORMAT[format - GL_COLOR_INDEX] + " " + pixelTypeToString(imgType) + " " + ptr.toString(16) + "\n")
 
@@ -3337,10 +2236,8 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
 
         public function glTexImage2D(target:uint, level:int, intFormat:int, width:int, height:int, border:int, format:uint, imgType:uint, ptr:uint, ram:ByteArray):void
         {
-            
             if (log) log.send( "[IMPLEMENTED] glTexImage2D " + target + " texid: " + textureSamplerIDs[activeTextureUnit] + " l:" + level + " " + intFormat + " " + width + "x" + height + " b:" + border + " " + 
                       PIXEL_FORMAT[format - GL_COLOR_INDEX] + " " + pixelTypeToString(imgType) + " " + imgType.toString(16) + "\n")
-
 
             if (intFormat == GL_LUMINANCE)
             {
@@ -3384,10 +2281,6 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
         
         public function glCompressedTexImage2D(target:uint, level:int, intFormat:uint, width:int, height:int, border:int, imageSize:int, ptr:uint, ram:ByteArray):void
         {
-            // if (log) log.send( "[IMPLEMENTED] glCompressedTexImage2D " + target + " " + level + " " + intFormat + " " + width + " " + height + " " + border + " " + imageSize + "\n")
-
-            //trace("intFormat is " + intFormat)
-            
             // Create appropriate texture type and upload data.
             if (target == GL_TEXTURE_2D)
                 create2DTexture(width, height, level, ram, ptr, (intFormat == 2 || intFormat == 3), true)
@@ -3397,9 +2290,6 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
                 if (log) log.send( "[NOTE] Unsupported texture type " + target + " for glCompressedTexImage2D")
             }
         }
-        
-        private static var texID:uint = 1 // so we have 0 as non-valid id
-        // texID == # of textures + 1
 
         // Returns index of first texture, guaranteed to be contiguous
         public function glGenTextures(length:uint):uint
@@ -3431,238 +2321,12 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
 
             textures[texid] = null // TODO: fix things so we can eventually reuse textureIDs
         }
-        
-        public function glPixelStorei(pname:uint, param:int):void
-        {
-            // if (log) log.send( "[STUBBED] glPixelStorei " + pname + " " + param + "\n")
-        }
 
-        private static var bufferID:uint = 0
-
-        // Returns index of first buffer, guaranteed to be contiguous
-        public function glGenBuffers(length:int):uint
-        {
-            // if (log) log.send( "[IMPLEMENTED] glGenBuffers " + length + "\n")
-            //ram.position = ptr
-            var result:uint = bufferID + 1
-            for (var i:int = 0; i < length; i++) {
-                dataBuffers[++bufferID] = new DataBuffer()
-                dataBuffers[bufferID].id = bufferID
-                //ram.writeUnsignedInt(bufferID)
-            }
-            return bufferID
-        }
-        
-        private static var fbID:uint = 0
-
-        // Returns index of first buffer, guaranteed to be contiguous
-        public function glGenFrameBuffers(length:int):uint
-        {
-            // trace( "glGenFramebuffers " + length + "\n")
-            //ram.position = ptr
-            var result:uint = fbID + 1
-            for (var i:int = 0; i < length; i++) {
-                frameBuffers[++fbID] = new FrameBuffer()
-                //ram.writeUnsignedInt(fbID)
-                // trace( "glGenFramebuffers: " + fbID + "\n")
-            }
-            return result
-        }
-
-        private static var rbID:uint = 0
-        
-        // Returns index of first buffer, guaranteed to be contiguous
-        public function glGenRenderBuffers(length:int):uint
-        {
-            // trace( "glGenRenderBuffers " + length + "\n")
-            //ram.position = ptr
-            var result:uint = rbID + 1
-            for (var i:int = 0; i < length; i++) {
-                renderBuffers[++rbID] = new RenderBuffer()
-                //ram.writeUnsignedInt(rbID)
-                // trace( "glGenRenderBuffers: " + rbID + "\n")
-            }
-            return result
-        }
-
-        public function glRenderbufferStorage(target:uint, format:uint, width:int, height:int):void
-        {
-            // trace("glRenderbufferStorage " + target + " " + format + " " + width + " " + height + "\n")
-
-            // HACK: check the format and determine whether we should actually allocate storage.
-            // For depth formats, we don't need to, since we always have to use the default
-            // depth surface.
-        }
-
-        public function glBindBuffer(target:uint,id:uint):void
-        {
-            if (target == GL_ARRAY_BUFFER)
-            {
-                activeArrayBuffer = dataBuffers[id]
-                if (activeArrayBuffer) activeArrayBuffer.target = target
-                // if (log) log.send( "[IMPLEMENTED] glBindBuffer GL_ARRAY_BUFFER " + id + " id: " + (activeArrayBuffer ? activeArrayBuffer.id : "null") + "\n")
-            }
-            else if (target == GL_ELEMENT_ARRAY_BUFFER)
-            {
-                activeElementBuffer = dataBuffers[id]
-                if (activeElementBuffer) activeElementBuffer.target = target
-                // if (log) log.send( "[IMPLEMENTED] glBindBuffer GL_ELEMENT_ARRAY_BUFFER " + id + " id: " + (activeElementBuffer ? activeElementBuffer.id : "null") + "\n")
-            }
-            //else
-                // if (log) log.send( "[NOTE] unsupported target format for glBindBuffer." )
-        }
-        
-        public function validateFramebufferState(validateShouldClearIfNeeded:Boolean):void
-        {
-            // trace("validateFramebufferState called")
-            if (pendingFrameBuffer != activeFrameBuffer)
-            {
-                if (pendingFrameBuffer == null)
-                {
-                    // trace("validateFramebufferState target is the backbuffer")
-                    activeFrameBuffer = null
-                    context.setRenderToBackBuffer()
-                }
-                else
-                {
-                    if (pendingFrameBuffer.colorTexture != null)
-                    {
-                        // trace("validateFramebufferState target is an offscreen texture, activating")
-                        activeFrameBuffer = pendingFrameBuffer
-                        context.setRenderToTexture(activeFrameBuffer.colorTexture, activeFrameBuffer.enableDepthAndStencil)
-
-                        // trace("validateFramebufferState: validateShouldClearIfNeeded is " + validateShouldClearIfNeeded)
-                        // trace("validateFramebufferState: activeFrameBuffer.lastClearFramestamp is " + activeFrameBuffer.lastClearFramestamp)
-                        // trace("validateFramebufferState:                            framestamp is " + framestamp)
-                        if (validateShouldClearIfNeeded)// && activeFrameBuffer.lastClearFramestamp != framestamp)
-                        {
-                            // trace("validateFramebufferState target cleared")
-                            context.clear(0.0, 0.0, 0.0, 0.0)
-                            activeFrameBuffer.lastClearFramestamp = framestamp
-                        }
-                    }
-                    else
-                    {
-                        // trace("validateFramebufferState target is an offscreen texture, but the texture doesn't exist yet\n")
-                    }
-                }
-            }
-        }
-
-        public function glBindFramebuffer(target:uint,framebuffer:uint):void
-        {
-            // trace("glBindFramebuffer " + target + " " + framebuffer)
-
-            var newPendingFrameBuffer:FrameBuffer = frameBuffers[framebuffer]
-            if (newPendingFrameBuffer != pendingFrameBuffer)
-            {
-                // If we're changing framebuffers and the current one never became active,
-                // we might need to clear it so that we can use it as a texture
-                if (pendingFrameBuffer != activeFrameBuffer)
-                {
-                    // Be sure to only do this if we actually have a texture attached and we haven't
-                    // already cleared the buffer this frame
-                    if (pendingFrameBuffer != null && pendingFrameBuffer.colorTexture != null)// &&
-                        //pendingFrameBuffer.lastClearFramestamp != framestamp)
-                    {
-                        // trace("glBindFramebuffer call is clearing the never-activated pendingFrameBuffer before unbinding")
-                        context.setRenderToTexture(pendingFrameBuffer.colorTexture, false)
-                        context.clear(0.0, 0.0, 0.0, 0.0)
-                        pendingFrameBuffer.lastClearFramestamp = framestamp
-
-                        // Restore the active framebuffer
-                        if (activeFrameBuffer != null && activeFrameBuffer.colorTexture != null)
-                        {
-                            context.setRenderToTexture(activeFrameBuffer.colorTexture, activeFrameBuffer.enableDepthAndStencil)
-                        }
-                    }
-                }
-                // Finally, set the new pending framebuffer
-                // trace("glBindFramebuffer call has updated the pendingFrameBuffer")
-                pendingFrameBuffer = newPendingFrameBuffer
-            }
-            else
-            {
-                // trace("glBindFramebuffer call is redundant, avoided")
-            }
-        }
-        
-        public function glFramebufferRenderbuffer(target:uint,attachment:uint,renderbuffertarget:uint,renderbuffer:uint):void
-        {
-            // trace("glFramebufferRenderbuffer " + target + " " + attachment + " " + renderbuffertarget + " " + renderbuffer + "\n")
-            
-            // HACK
-            if (pendingFrameBuffer != null)
-            {
-                // trace("glFramebufferRenderbuffer is setting enableDepthAndStencil to true")
-                pendingFrameBuffer.enableDepthAndStencil = true
-            }
-        }
-
-        public function glFramebufferTexture2D(target:uint,attachment:uint,textarget:uint,texture:uint,level:int):void
-        {
-            // trace("glFramebufferTexture2D " + target + " " + attachment + " " + textarget + " " + texture + " " + level + "\n")
-
-            if (pendingFrameBuffer != null)
-            {
-                // trace("glFramebufferTexture2D is updating the color texture on pendingFrameBuffer")
-                pendingFrameBuffer.colorTexture = textures[texture].texture
-            }
-        }
-
-        public function glBindRenderbuffer(target:uint,renderbuffer:uint):void
-        {
-            // trace("glBindRenderbuffer " + target + " " + renderbuffer + "\n")
-            activeRenderBuffer = renderBuffers[renderbuffer]
-        }
-        
-        public function glBufferData(target:uint, usage:uint, data:ByteArray):void
-        {
-            if (usage != GL_STREAM_DRAW && usage != GL_STATIC_DRAW) {
-                // if (log) log.send( "[NOTE] unsupported usage format for glBufferData." )
-            } else {
-                if (target == GL_ARRAY_BUFFER)
-                {
-                    // if (log) log.send( "[IMPLEMENTED] glBufferData GL_ARRAY_BUFFER (id: " + activeArrayBuffer.id +  " ) " + data.length + " " + usage + "\n")
-                    activeArrayBuffer.usage = usage
-                    activeArrayBuffer.data = data
-                    activeArrayBuffer.size = data.length
-                }
-                else if (target == GL_ELEMENT_ARRAY_BUFFER)
-                {
-                    // if (log) log.send( "[IMPLEMENTED] glBufferData GL_ELEMENT_ARRAY_BUFFER (id: " + activeElementBuffer.id +  " ) " + data.length + " " + usage + "\n")
-                    activeElementBuffer.usage = usage
-                    activeElementBuffer.data = data
-                    activeElementBuffer.size = data.length
-                }
-                else
-                    if (log) log.send( "[NOTE] unsupported target format for glBufferData." )
-            }
-        }
-        
-//        public function glDepthMask(flag:Boolean):void
-//        {
-//            // if (log) log.send( "[IMPLEMENTED] glDepthMask " + flag + "\n")
-//            contextDepthMask = flag 
-//        }
-        
         public function glColorMask(red:Boolean, green:Boolean, blue:Boolean, alpha:Boolean):void
         {
             if (log) log.send( "[IMPLEMENTED] glColorMask " + red + " " + green + " " + blue + " " + alpha + "\n")
             context.setColorMask(red, green, blue, alpha)  
         }
-        
-        
-        /* StencilOp */
-        //public static const GL_ZERO:uint =        0
-        public static const GL_KEEP:uint =        0x1E00
-        public static const GL_REPLACE:uint =     0x1E01
-        public static const GL_INCR:uint =        0x1E02
-        public static const GL_DECR:uint =        0x1E03
-        public static const GL_INVERT:uint =      0x150A
-        public static const GL_INCR_WRAP:uint =   0x8507
-        public static const GL_DECR_WRAP:uint =   0x8508
-        
         
         private function stencilOpToContext3DStencilAction(op:uint):String
         {
@@ -3722,23 +2386,6 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             commitStencilState()
         }
 
-        
-//        public function glDepthFunc(func:uint):void
-//        {
-//            //trace( "[IMPLEMENTED] glDepthFunc " + func + "\n")       
-//            if (func == GL_NEVER) contextDepthFunc = Context3DCompareMode.NEVER
-//            else if (func == GL_LESS) contextDepthFunc = Context3DCompareMode.LESS
-//            else if (func == GL_EQUAL) contextDepthFunc = Context3DCompareMode.EQUAL
-//            else if (func == GL_LEQUAL) contextDepthFunc = Context3DCompareMode.LESS_EQUAL
-//            else if (func == GL_GREATER) contextDepthFunc = Context3DCompareMode.GREATER
-//            else if (func == GL_NOTEQUAL) contextDepthFunc = Context3DCompareMode.NOT_EQUAL
-//            else if (func == GL_GEQUAL) contextDepthFunc = Context3DCompareMode.GREATER_EQUAL
-//            else if (func == GL_ALWAYS) contextDepthFunc = Context3DCompareMode.ALWAYS
-//        }
-
-        var scissorRect:Rectangle
-        var contextEnableScissor:Boolean = false
-        
         public function glScissor(x:int, y:int, width:int, height:int):void
         {
             if(log) log.send("glScissor " + x + ", " + y + ", " + width + ", " + height)
@@ -3763,436 +2410,12 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             contextClearDepth = depth          
         }
 
-//        public function glFrontFace(mode:uint):void
-//        {
-//            // if (log) log.send( "[IMPLEMENTED] glFrontFace " + mode + "\n")
-//            contextFrontFace = mode            
-//        }
-
         public function glClearStencil(s:int):void
         {
             // if (log) log.send( "[IMPLEMENTED] glClearStencil " + s + "\n")
             contextClearStencil = s                
         }
 
-        public function glEnableVertexAttribArray(index:uint):void
-        {
-            // if (log) log.send( "[IMPLEMENTED] glEnableVertexAttribArray " + index + "," + vertexBufferAttributes[index] + "\n")
-            if (!activeArrayBuffer)
-                return
-
-            vertexAttributesDirty = true
-            vertexBufferAttributes[index].enabled = true
-        }
-
-        public function glDisableVertexAttribArray(index:uint):void
-        {
-            // if (log) log.send( "[IMPLEMENTED] glDisableVertexAttribArray " + index + "\n")
-            if (!activeArrayBuffer)
-                return
-
-            vertexAttributesDirty = true
-            vertexBufferAttributes[index].enabled = false       
-        }
-
-/*        public function glUniform1i(location:int, v0:int):void
-        {
-            if (location < 0) return
-            
-            var uniformName:String = activeProgram.uniformNames[location]
-
-            // Track our samplers.
-            var programVar:AGALVar = activeProgram.fragmentShaderVars[uniformName]
-            if (programVar && programVar.isSampler)
-                activeProgram.activeSamplers[v0] = true
-
-            setProgramConstantData(location, CDATA_FLOAT1, v0, activeProgram)
-        }
-  */     
-        public function glDrawElements(mode:uint, count:int, type:uint, ptr:uint, ptrlen:uint, ram:ByteArray):void
-        {
-            // if (log) log.send( "glDrawElements " + mode + " " + count + " " + type + " " + data.length + "\n")
-
-            // Only support 'sequential' triangle strips in DE right now.
-            if (mode == 5)
-            {
-// This will enable beam hack for rendering
-/**/
-                activeElementBuffer = acquireSequentialTriStripIndexBuffer(count)
-                // Adjust the count
-                var triCount:int = (count - 2)
-                type = indexBufferSequentialTriStrip.indicesSize
-                count = triCount * 3
-                mode = 4
-                ptr = 0
-                ptrlen = count * 2
-/**/
-//                return
-            }
-
-            var dataBuffer:DataBuffer = activeElementBuffer
-            var pos:uint = 0
-
-            if (!activeElementBuffer)
-            {
-                dataBuffer = acquireBufferFromPool(count, 0, GL_ELEMENT_ARRAY_BUFFER)
-                dataBuffer.indicesSize = type
-                dataBuffer.target = GL_ELEMENT_ARRAY_BUFFER
-                dataBuffer.data.position = 0
-                dataBuffer.data.writeBytes(ram, ptr, ptrlen)
-                dataBuffer.data.length = ptrlen
-                dataBuffer.data.position = 0
-                dataBuffer.size = ptrlen
-                uploadBuffer(dataBuffer)
-            }
-            else
-            {
-                pos = ptr/2
-            }
-            
-            // Construct our associated Context3D's index buffer if necessary.
-            if (dataBuffer && !dataBuffer.uploaded)
-            {
-                dataBuffer.indicesSize = type
-                uploadBuffer(dataBuffer)
-            }
-         
-            // Textures
-            var ti:TextureInstance
-            for (var i:int = 0; i < 1; i++ )
-            {
-                if (activeProgram.activeSamplers[i])
-                {
-                    ti = textureSamplers[i]
-                    context.setTextureAt(i, ti.boundType == GL_TEXTURE_2D ? ti.texture : ti.cubeTexture)
-                    if(log) log.send("setTexture " + i + " -> " + ti.texID)
-                }
-                else
-                {
-                    context.setTextureAt(i, null)
-                    if(log) log.send("setTexture " + i + " -> 0")
-            }
-            }
-
-            activeProgram.updateConstants(context)
-            
-
-            // Attributes
-            if (vertexAttributesDirty)
-            {
-        var len:uint = vertexBufferAttributes.length
-                for (var v:int = 0; v < len ; v++)
-                {
-                    var vba:VertexBufferAttribute = vertexBufferAttributes[v]
-                    if (vba && vba.enabled && activeProgram.vertexStreamIndicies[v])
-                    {  
-                        var format:String
-                        if (vba.size == 3 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_3
-                        else if (vba.size == 2 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_2
-                        else if (vba.size == 4 && vba.type == GL_UNSIGNED_BYTE)
-                            format = Context3DVertexBufferFormat.BYTES_4
-                        else if (vba.size == 4 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_4
-                        else if (vba.size == 1 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_1
-                        else
-                            throw(new Error("Unhandled vertex buffer format size " + vba.size + " type " + vba.type))
-
-                        context.setVertexBufferAt(v, vba.buffer.vertexBuffer, vba.offset / 4, format)
-                    }
-                    else
-                    {
-                        context.setVertexBufferAt(v, null, 0, "")
-                    }
-                }
-                        
-                vertexAttributesDirty = false
-            }
-
-            // trace("validateFramebufferState from glDrawElements")
-            validateFramebufferState(true)
-
-            if(contextEnableDepth)
-                context.setDepthTest(contextDepthMask, contextDepthFunc)
-            else
-                context.setDepthTest(false, Context3DCompareMode.ALWAYS)
-
-            //trace("Draw Triangles program " + activeProgram.id)
-            context.drawTriangles(dataBuffer.indexBuffer, pos, count/3)
-        }
-
-        private var indexBufferCache:DataBuffer
-        private var indexBufferQuadCache:ByteArray = new ByteArray()
-
-        public function glDrawArrays(mode:uint, first:uint, count:uint):void
-        {
-            var buffer:DataBuffer
-        var numTris:uint = count - 2
-            if (count == 4 && mode == 5)
-            {
-                buffer = acquireBufferFromPool(count, 0, GL_ELEMENT_ARRAY_BUFFER)
-                buffer.indexBuffer = context.createIndexBuffer(6)
-                buffer.indexBuffer.uploadFromByteArray(indexBufferQuadCache, 0, 0, 6)
-                buffer.uploaded = true
-            }
-            else
-            {
-                if (mode == 5) // TODO: Add proper support for arbitrary TS index buffer.
-                    return
-                buffer = indexBufferCache
-            }
-            
-            // Textures
-            for (var i:int = 0; i < 1; i++ )
-            {
-                var ti:TextureInstance = textureSamplers[i]
-                if (activeProgram.activeSamplers[i] && ti)
-                {
-                    context.setTextureAt(i, ti.boundType == GL_TEXTURE_2D ? ti.texture : ti.cubeTexture)
-                    if(log) log.send("setTexture " + i + " -> " + ti.texID)
-                }
-                else
-                {
-                    context.setTextureAt(i, null)
-                    if(log) log.send("setTexture " + i + " -> 0")
-            }
-            }
-            
-            activeProgram.updateConstants(context)
-
-            // Attributes
-            if (vertexAttributesDirty)
-            {
-        var len:uint = vertexBufferAttributes.length
-                for (var v:int = 0; v < len; v++)
-                {
-                    var vba:VertexBufferAttribute = vertexBufferAttributes[v]
-                    if (vba && vba.enabled && activeProgram.vertexStreamIndicies[v])
-                    {  
-                        var format:String
-                        if (vba.size == 3 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_3
-                        else if (vba.size == 2 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_2
-                        else if (vba.size == 4 && vba.type == GL_UNSIGNED_BYTE)
-                            format = Context3DVertexBufferFormat.BYTES_4
-                        else if (vba.size == 4 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_4
-                        else if (vba.size == 1 && vba.type == GL_FLOAT)
-                            format = Context3DVertexBufferFormat.FLOAT_1
-                        else
-                            throw(new Error("Unhandled vertex buffer format size " + vba.size + " type " + vba.type))
-                            
-                        context.setVertexBufferAt(v, vba.buffer.vertexBuffer, vba.offset / 4, format)
-                    }
-                    else
-                    {
-                        context.setVertexBufferAt(v, null, 0, "")
-                    }
-                }
-                        
-                vertexAttributesDirty = false
-            }
-
-            // trace("validateFramebufferState from glDrawArrays")
-            validateFramebufferState(true)
-
-            if(contextEnableDepth)
-                context.setDepthTest(contextDepthMask, contextDepthFunc)
-            else
-                context.setDepthTest(false, Context3DCompareMode.ALWAYS)
-
-            //trace("DrawArrays program " + activeProgram.id )
-            context.drawTriangles(buffer.indexBuffer, 0, numTris)
-        }
-        
-        public function glVertexAttribPointer(index:uint, size:int, type:uint, normalized:Boolean, stride:int, ptr:uint, ptrlen:uint, ram:ByteArray):void
-        {
-            // if (log) log.send( "glVertexAttribPointer " + index + " " + size + " " + type + " " + normalized + " " + stride + " " + offset + "\n")
-            var isGeneric:Boolean = true
-            var dataBuffer:DataBuffer = activeArrayBuffer
-            if (!dataBuffer)
-            {
-                isGeneric = false
-                dataBuffer = acquireBufferFromPool(ptrlen / stride, stride / 4,  GL_ARRAY_BUFFER)
-        dataBuffer.data.position = 0
-        dataBuffer.data.writeBytes(ram, ptr, ptrlen)
-        dataBuffer.data.length = ptrlen
-        dataBuffer.data.position = 0
-                dataBuffer.size = ptrlen
-            } else {
-                var offset:uint = ptr
-            }
-                
-            // Construct our associated Context3D's vertex buffer if necessary (now that we know stride).
-            if (dataBuffer && !dataBuffer.uploaded)
-            {
-                dataBuffer.stride = stride
-                uploadBuffer(dataBuffer)
-            }
-
-            var enabled:Boolean = vertexBufferAttributes[index] ? vertexBufferAttributes[index].enabled : false
-            var vba:VertexBufferAttribute = new VertexBufferAttribute()
-            vba.buffer = dataBuffer
-            vba.offset = offset
-            vba.stride = stride
-            vba.size = size
-            vba.type = type
-            vba.normalize = normalized
-            vba.isGeneric = isGeneric
-            vba.enabled = enabled || !isGeneric 
-            vertexBufferAttributes[index] = vba
-            vertexAttributesDirty = true
-        }
-        
-        public function glUseProgram(program:uint):void
-        {
-            // if (log) log.send( "[TODO] glUseProgram " + program + "\n")
-            var pi:ProgramInstance = programs[program]
-            if (pi)
-            {
-                // Check to see if the program has any constants and if not,
-                // force an update anyway to ensure "automatic" ones are
-                // valid
-                pi.vertexConstantsDirty = true
-                pi.fragmentConstantsDirty = true
-
-                context.setProgram(pi.program)
-            }
-            else
-            {
-                context.setProgram(null)
-            }
-
-            activeProgram = program ? programs[program] : null
-        }
-        
-/*        public function glLinkProgram(program:uint):void
-        {
-            // if (log) log.send( "[IMPLEMENTED] glLinkProgram " + program + "\n")
-            var pi:ProgramInstance = programs[program]
-            
-            if (!macroAssembler)
-                macroAssembler = new AGALMacroAssembler()
-                
-            // Assemble Vertex Shader
-            var vertexShaderBytes:ByteArray = macroAssembler.assemble(Context3DProgramType.VERTEX, pi.vertexShader.source)
-            pi.vertexShaderVars = macroAssembler.inputVars
-            setCommonShaderConstants(pi, pi.vertexShaderVars, true)
-            if (dumpShaderCode == true)
-            {
-                trace("VERTEX SHADER FOR PROGRAM " + program)
-                trace(macroAssembler.asmCode)
-            }
-
-            //cache vertex stream positions
-            for (var key:String in pi.vertexShaderVars)
-            {
-                var agalVar:AGALVar = pi.vertexShaderVars[key]
-                if (agalVar.isVertexAttribute)
-                {
-                        pi.vertexStreamIndicies[agalVar.StreamPosition] = true
-                }
-            }
-
-            
-            // Assemble Fragment Shader
-            var vertexVaryings:Dictionary = macroAssembler.varyings
-            var fragmentShaderBytes:ByteArray = macroAssembler.assemble(Context3DProgramType.FRAGMENT, pi.fragmentShader.source, vertexVaryings)
-            pi.fragmentShaderVars = macroAssembler.inputVars
-            setCommonShaderConstants(pi, pi.fragmentShaderVars, false)
-            if (dumpShaderCode == true)
-            {
-                trace("FRAGMENT SHADER FOR PROGRAM " + program)
-                trace(macroAssembler.asmCode)
-            }
-            
-            // Upload
-            pi.program.upload(vertexShaderBytes, fragmentShaderBytes)
-        }
-*/
-        
-        public function glShaderSource(shader:uint, str:String):void
-        {
-            if (dumpShaderCode == true)
-            {
-                // if (log) log.send( str + "\n" )
-                trace(str)
-            }
-            var si:ShaderInstance = shaders[shader]
-            si.source = str
-        }
-        
-        public function glAttachShader(program:uint, shader:uint):void
-        {
-            // if (log) log.send( "[IMPLEMENTED] glAttachShader " + program + " " + shader + "\n")
-            var pi:ProgramInstance = programs[program]
-            var si:ShaderInstance = shaders[shader]
-            if (si.shaderType == GL_VERTEX_SHADER)
-                pi.vertexShader = si
-            else 
-                pi.fragmentShader = si
-        }
-
-        private static var progID:uint = 0
-
-        public function glCreateProgram():uint
-        {
-            progID++
-            // if (log) log.send( "[IMPLEMENTED] glCreateProgram " + progID + "\n")
-            var pi:ProgramInstance = new ProgramInstance()
-            programs[progID] = pi
-            pi.id = progID
-            pi.program = context.createProgram()
-            return progID
-        }
-
-        private static var shaderID:uint = 0
-
-        public function glCreateShader(shaderType:uint):uint
-        {
-            shaderID++
-            var si:ShaderInstance = new ShaderInstance()
-            shaders[shaderID] = si
-            si.shaderType = shaderType
-            return shaderID
-        }
-        
-//        public function glGetAttribLocation(program:uint, name:String):int
-//        {
-//            var p:ProgramInstance = programs[program]
-//            var location:int = getVarLocation(name, p)
-//
-//            if (location != -1)
-//            {
-//                programs[program].attributePositions[name] = location
-//                programs[program].attributeNames[location] = name
-//            }
-//            return location
-//        }
-        
-//        public function glGetUniformLocation(program:uint, name:String):int
-//        {
-//            var p:ProgramInstance = programs[program]
-//            var location:int = getVarLocation(name, p)
-//            
-//            // if (log) log.send( "[IMPLEMENTED] glGetUniformLocation " + program + " " + name + " " + location + "\n")
-//            if (location != -1)
-//            {
-//                programs[program].uniformPositions[name] = location
-//                programs[program].uniformNames[location] = name
-//            }
-//            return location
-//        }
-        
-        public function glBlendEquationSeparate(modeRGB:uint, modeAlpha:uint):void
-        {
-            // TODO
-            //trace("glBlendEquationSeparate: modeRGB = " + modeRGB + ", modeA = " + modeAlpha)
-        }
-        
         private function translateBlendFactor( openGLBlendFactor:uint ): String
         {
             if ( openGLBlendFactor == GL_ONE )
@@ -4278,34 +2501,12 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             {
                 context.setBlendFactors(contextSrcBlendFunc, contextDstBlendFunc)
             }
-//            else
-//            {
-//                trace("glBlendFuncSeparate: contextEnableBlending FALSE w/ srcRGB = " + srcRGB + ", drtRGB = " + dstRGB + ", srcA = " + srcAlpha + ", dstA = " + dstAlpha)
-//            }
-        }
-        
-        
-        public function eglSwapBuffers():void
-        {
-            // trace( "eglSwapBuffers called")
-            context.present()
-            context.clear(0.0, 0.0, 0.0, 0.0)
-            framestamp++
-
-        //for(var s:String in counts) {
-        //    trace("count " + s + ": " + counts[s])
-        //    counts[s] = 0
-        //}
         }
         
         // ======================================================================
         //  Functions
         // ----------------------------------------------------------------------
-        protected function configureBackBuffer():void
-        {
-            context.configureBackBuffer(contextWidth, contextHeight, contextAA, true)
-        }
-        
+
         protected function create2DTexture(width:int, height:int, level:int, data:ByteArray, dataOff:uint, compressed:Boolean=false, compressedUpload:Boolean=false):void
         {
             var instance:TextureInstance = activeTexture
@@ -4315,150 +2516,30 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
                 return
             }
 
-                if (!instance.texture)
-                {
-                    //trace("Compressed is " + compressed ? Context3DTextureFormat.COMPRESSED : Context3DTextureFormat.BGRA)
-                    instance.texture = 
-                        context.createTexture(width, height, compressed ? Context3DTextureFormat.COMPRESSED : Context3DTextureFormat.BGRA, dataOff == 0 ? true : false)
-                    
-                    textureSamplers[activeTextureUnit] = instance
-                }
-
-                if(level >= instance.mipLevels) {
-                    instance.mipLevels++
-                } else {
-                    if (log) log.send( "[NOTE] glTexImage2D replacing mip...")
-                }
+            if (!instance.texture)
+            {
+                //trace("Compressed is " + compressed ? Context3DTextureFormat.COMPRESSED : Context3DTextureFormat.BGRA)
+                instance.texture = 
+                    context.createTexture(width, height, compressed ? Context3DTextureFormat.COMPRESSED : Context3DTextureFormat.BGRA, dataOff == 0 ? true : false)
                 
+                textureSamplers[activeTextureUnit] = instance
+            }
+
+            if(level >= instance.mipLevels) {
+                instance.mipLevels++
+            } else {
+                if (log) log.send( "[NOTE] glTexImage2D replacing mip...")
+            }
+            
             // FIXME (egeorgie) - we need a boolean param instead?
-                //if (dataOff != 0)
+            //if (dataOff != 0)
+            {
+                if (compressedUpload)
+                    instance.texture.uploadCompressedTextureFromByteArray(data, dataOff)
+                else
                 {
-                    if (compressedUpload)
-                        instance.texture.uploadCompressedTextureFromByteArray(data, dataOff)
-                    else
-                    {
-//                    // Debug: generate texture image
-//                        var bmp:BitmapData = new BitmapData(width, height, true, 0xFFFFFFFF)
-//                        var shape:Shape = new Shape()
-//                        
-//                        for (var i:int = 0; i< width / 6; i++)
-//                        {
-//                            shape.graphics.lineStyle(2, (1 | (i << 16)))
-//                            shape.graphics.drawCircle(width / 2, height / 2, width / 3 - i * 8 - 5)
-//                        }
-//                        bmp.draw(shape)
-//                        var buf:ByteArray = bmp.getPixels(new Rectangle(0, 0, width, height))
-//                        instance.texture.uploadFromByteArray(buf, 0, level)
-                        
-                        
-//                    // Debug: display the texture image:
-//                    //data.position = dataOff
-//                        var bmp:BitmapData = new BitmapData(width, height)
-//                        var buf:ByteArray = new ByteArray()
-//                        var words:int = width * height
-//                        buf.length = words * 4
-//                        data.position = dataOff
-//                        data.readBytes(buf, 0, buf.length)
-//                        buf.position = 0
-//                        bmp.setPixels(new Rectangle(0, 0, width, height), buf)
-//                        debugTextures.push(bmp)
-//
-//                    
-//                    var bmp:BitmapData = new BitmapData(width, height)
-//                    var words:int = width * height
-//                    data.position = dataOff
-//                    bmp.setPixels(new Rectangle(0, 0, width, height), data)
-//                    debugTextures.push(bmp)
-
-                        instance.texture.uploadFromByteArray(data, dataOff, level)
-                    }
+                    instance.texture.uploadFromByteArray(data, dataOff, level)
                 }
-            }
-        
-        private var debugTextures:Vector.<BitmapData> = new Vector.<BitmapData>()
-        private var debugTexQuadID:int = -1
-        
-        public function renderTextureGL():void
-        {
-            if (debugTexQuadID == -1)
-            {
-                debugTexQuadID = glGenLists(1)
-                glNewList(debugTexQuadID, 0)
-                glBegin(GL_QUADS)
-                    glTexCoord(0, 0)
-                    glColor(1, 0, 0, 1)
-                    glVertex(0, 0, 0)
-                
-                    glTexCoord(1, 0)
-                    glColor(1, 0, 0, 1)
-                    glVertex(1, 0, 0)
-    
-                    glTexCoord(1, 1)
-                    glColor(0, 0, 0, 1)
-                    glVertex(1, 1, 0)
-    
-                    glTexCoord(0, 1)
-                    glColor(0, 1, 0, 1)
-                    glVertex(0, 1, 0)
-                glEnd()
-                glEndList()
-            }
-            
-            var texPerRow:int = 20
-            var w:Number = 2.0 / Number(texPerRow)
-            var h:Number = w
-            var x:Number = -1
-            var y:Number = 1 - h
-            
-            var mStack:Vector.<Matrix3D> = modelViewStack
-            var pStack:Vector.<Matrix3D> = projectionStack
-            
-            modelViewStack = new <Matrix3D>[ new Matrix3D()]
-            projectionStack = new <Matrix3D>[ new Matrix3D()]
-            
-            glMatrixMode(GLAPI.GL_MODELVIEW)
-            for (var i:int = 1; i < texID; i++)
-            {
-                glPushMatrix()
-                glTranslate(x + Math.round(i % texPerRow) * w, y - Math.round(i / texPerRow) * h, 0)
-                glScale(2 / texPerRow, 2 / texPerRow, 1)
-                glBindTexture(GL_TEXTURE_2D, i)
-                glCallList(debugTexQuadID)
-                glPopMatrix()
-            }
-            
-            modelViewStack = mStack
-            projectionStack = pStack
-            glMatrixMode(GLAPI.GL_MODELVIEW)
-        }
-        
-        public function renderTextures(s:Sprite, width:int):void
-        {
-            var g:Graphics = s.graphics
-            var count:int = debugTextures.length
-            var x:int = 0
-            var y:int = 0
-            var w:int
-            var h:int
-            var rowHeight:int = 0
-            for (var i:int; i < count; i++)
-            {
-                w = debugTextures[i].width
-                h = debugTextures[i].height
-                
-                if (x + w > width)
-                {
-                    y += rowHeight
-                    rowHeight = 0
-                    x = 0
-                }
-
-                g.lineStyle(0, 0xFF0000)
-                g.beginBitmapFill(debugTextures[i])
-                g.drawRect(x, y, w, h)
-                
-                x += w
-                rowHeight = Math.max(rowHeight, h)
             }
         }
         
@@ -4485,627 +2566,134 @@ if (log) log.send("[WARNING] Calling glTexEnvf with unsupported pname " + pname 
             else 
                 if (log) log.send( "[NOTE] No previously bound texture for glCompressedTexImage2D (2D)")
         }
-        
-        protected function uploadBuffer(buffer:DataBuffer):void
-        {
-            if (buffer.target == GL_ARRAY_BUFFER)
-            {
-                if (!buffer.vertexBuffer)
-                {
-                    //trace("creating vertex buffer from context3D with args triangles " + buffer.size / buffer.stride + " stride " + buffer.stride / 4 )
-                    buffer.vertexBuffer = context.createVertexBuffer(buffer.size / buffer.stride, buffer.stride / 4)
-                }
-                buffer.vertexBuffer.uploadFromByteArray(buffer.data, 0, 0, buffer.size / buffer.stride)
-                buffer.uploaded = true
-            }
-            else if (buffer.target == GL_ELEMENT_ARRAY_BUFFER)
-            {
-                if (buffer.indicesSize == GL_UNSIGNED_SHORT)
-                {
-                    if (!buffer.indexBuffer)
-                        buffer.indexBuffer = context.createIndexBuffer(buffer.size/2)
-                    buffer.indexBuffer.uploadFromByteArray(buffer.data, 0, 0, buffer.size/2)
-                    buffer.uploaded = true
-                }
-                else
-                {
-                    if (log) log.send( "[NOTE] Invalid index buffer format (not GL_UNSIGNED_SHORT)")
-                }
-            } else {
-                if (log) log.send("INVALID BUFFER TARGET " + buffer.target)
-            }
-        }
-        
-        protected function setProgramConstantData(location:int, type:int, value:*, pi:ProgramInstance):void
-        {
-            var isFragment:Boolean = location >= 512
-            location = isFragment ? location - 512 : location
-            var buffer:Vector.<Number> = isFragment ? pi.fragmentConstantsData : pi.vertexConstantsData
-            
-        if(isFragment)
-            pi.fragmentConstantsDirty = true
-        else
-            pi.vertexConstantsDirty = true            
-
-            // Expand if necessary
-            if (location + type >= buffer.length)
-                buffer.length = Math.ceil((location + type + 1)/4)*4
-            var vdata:Vector.<Number> = value as Vector.<Number>
-
-            switch(type)
-            {
-                case CDATA_FLOAT1:
-                    buffer[location] = value
-                    break
-                case CDATA_FLOAT2:
-                    buffer[location] = vdata[0]
-                    buffer[location+1] = vdata[1]
-                    break
-                case CDATA_FLOAT3:
-                    buffer[location] = vdata[0]
-                    buffer[location+1] = vdata[1]
-                    buffer[location+2] = vdata[2]
-                    break
-                case CDATA_FLOAT4:
-                    buffer[location] = vdata[0]
-                    buffer[location+1] = vdata[1]
-                    buffer[location+2] = vdata[2]
-                    buffer[location+3] = vdata[3]
-                    break
-                case CDATA_MATRIX4x4:
-                    for (var i:int = 0; i < 16; i++)
-                        buffer[location+i] = vdata[i]
-                    break
-            }
-        }
-/*        
-        protected function setCommonShaderConstants(pi:ProgramInstance, vars:Dictionary, isVertex:Boolean):void
-        {
-            for (var key:String in vars)
-            {
-                var agalVar:AGALVar = vars[key]
-                if (agalVar.isConstant())
-                {
-                    var location:uint = getVarLocation(agalVar.name, pi)
-                   // trace("Setting location " + agalVar.name + " with location " + location + " to " + agalVar.x)
-                //    trace("Setting location " + agalVar.name +  " with location " + (location + 1) + " to " + agalVar.y)
-                    if (location >= 0)
-                    {
-                        setProgramConstantData(location, CDATA_FLOAT1, agalVar.x, pi)
-                        setProgramConstantData(location + 1, CDATA_FLOAT1, agalVar.y, pi)
-                        setProgramConstantData(location + 2, CDATA_FLOAT1, agalVar.z, pi)
-                        setProgramConstantData(location + 3, CDATA_FLOAT1, agalVar.w, pi)
-                    }
-                }
-            }
-        }
-  */      
-/*        
-        // Helper to tease out location information for a given AGALVar slot.
-        // The location can be used later to infer where to set constant data or
-        // which vertex stream to assign where.
-        protected function getVarLocation(variable:String, program:ProgramInstance):int
-        {
-            var idx:int = -1
-            var isVertexVar:Boolean = false
-            var agalVar:AGALVar = program.vertexShaderVars[variable]
-            var isVertexVar:Boolean = (agalVar != null)
-            agalVar =  (agalVar != null) ? agalVar : program.fragmentShaderVars[variable]
-
-            if (agalVar)
-            {
-                if (agalVar.StreamPosition != -1)
-                {
-                    var position:int = agalVar.StreamPosition
-                    var dot:int = agalVar.target.indexOf( "." )
-                    if (dot > 0 && (agalVar.target.length - 1) > dot)
-                    {
-                        var offset:int = 0
-                        switch (agalVar.target.charAt(dot+1))
-                        {
-                            case 'y': offset = offset + 1
-                                break
-                            case 'z': offset = offset + 2
-                                break
-                            case 'w': offset = offset + 3
-                                break
-                        }
-                        position += offset
-                    }
-
-                    if (agalVar.isProgramConstant) 
-                    {
-                        position = position * 4
-                        idx = (isVertexVar) ? position : 512 + position
-                    }
-                    else
-                        idx = position
-                }
-            }
-            return idx
-        }
-*/
-        // Buffer pooling helpers
-        protected function acquireBufferFromPool(numElements:int, data32PerVertex:int, target:uint):DataBuffer
-        {
-            var isVertexBuffer:Boolean = target == GL_ARRAY_BUFFER
-            var key:uint
-
-        if(isVertexBuffer)
-            key =  data32PerVertex << 26 | numElements
-        else
-            key = numElements
-
-            var candidates:BufferPool = isVertexBuffer ? vertexBufferPool[key] : indexBufferPool[key]
-
-            var match:DataBuffer = null
-            if (!candidates)
-            {
-                candidates = new BufferPool()
-                if (isVertexBuffer)
-                    vertexBufferPool[key] = candidates
-                else
-                    indexBufferPool[key] = candidates
-            }
-            
-            var db:DataBuffer = candidates.getBuffer(framestamp)
-            db.target = target
-            db.uploaded = false
-            return db
-        }
-
-        // Sequential TriStrip index buffer
-        private var totalSequentialTriStripCacheSize:int = 0
-        private var sequentialTriStripCacheSize:int = 0
-        private var indexBufferSequentialTriStrip:DataBuffer = new DataBuffer()
-
-        // Grab an index buffer that will render sequentially packed tristrips as trilist
-            protected function acquireSequentialTriStripIndexBuffer(numElements:int):DataBuffer
-            {
-            // What is the number of elements we actually need
-            var triCount:int = (numElements - 2)
-            var triIdx:int = 0
-            var requiredIndexCount:int = triCount * 3
-
-// The 'false' case will use a shared index buffer that grows to the largest required size
-// HOWEVER, it appears that rendering w/ an index buffer that does not match the number of
-// vertices bound (largest index in the index buffer > bound vertex count) does not work.
-if (false)
-{
-            // Do we need more entries in the index buffer?
-            var bRepackRequired:Boolean = false
-            if (context.enableErrorChecking == false)
-            {
-                bRepackRequired = (requiredIndexCount > sequentialTriStripCacheSize)
-            }
-            else
-            {
-                // We have to repack if the size changes at all w/ the error checking enabled
-                // Apparently it walks the index buffer to find the max vertex index...
-                bRepackRequired = (requiredIndexCount != sequentialTriStripCacheSize)
-            }
-            // Repacking *every* call works...
-            //bRepackRequired = (requiredIndexCount != sequentialTriStripCacheSize)
-
-            if (bRepackRequired)
-            {
-                //trace("acquireSequentialTriStripIndexBuffer: requiredIndexCount " + requiredIndexCount + ", sequentialTriStripCacheSize " + sequentialTriStripCacheSize)
-
-                indexBufferSequentialTriStrip.target = GL_ELEMENT_ARRAY_BUFFER
-                indexBufferSequentialTriStrip.indicesSize = GL_UNSIGNED_SHORT
-                indexBufferSequentialTriStrip.data.clear()
-
-                // THIS ONLY WORKS IF THE TRI STRIPS USE SEQUENTIAL VERTEX DATA!!!!
-                // Fill in the index buffer
-                //@todo. can we just fill in the newly required ones? Possibly faster...
-                indexBufferSequentialTriStrip.data.position = 0
-                for (triIdx = 0; triIdx < triCount; triIdx += 2)
-                {
-                    indexBufferSequentialTriStrip.data.writeShort(0 + triIdx)
-                    indexBufferSequentialTriStrip.data.writeShort(1 + triIdx)
-                    indexBufferSequentialTriStrip.data.writeShort(2 + triIdx)
-                    indexBufferSequentialTriStrip.data.writeShort(2 + triIdx)
-                    indexBufferSequentialTriStrip.data.writeShort(1 + triIdx)
-                    indexBufferSequentialTriStrip.data.writeShort(3 + triIdx)
-                }
-                indexBufferSequentialTriStrip.data.length = requiredIndexCount * 2
-                indexBufferSequentialTriStrip.data.position = 0
-                indexBufferSequentialTriStrip.size = requiredIndexCount * 2
-//                uploadBuffer(dataBuffer)
-
-                // If we have an index buffer, dispose
-                if (indexBufferSequentialTriStrip.indexBuffer != null)
-                {
-                    indexBufferSequentialTriStrip.indexBuffer.dispose()
-                }
-
-                // Create a new index buffer
-                indexBufferSequentialTriStrip.indexBuffer = context.createIndexBuffer(requiredIndexCount)
-                indexBufferSequentialTriStrip.indexBuffer.uploadFromByteArray(indexBufferSequentialTriStrip.data, 0, 0, requiredIndexCount)
-                indexBufferSequentialTriStrip.uploaded = true
-
-                sequentialTriStripCacheSize = requiredIndexCount
-            }
-
-            return indexBufferSequentialTriStrip
-}
-else
-{
-            var match:DataBuffer = squentialTripStripIndexBufferPool[requiredIndexCount]
-            if (match == null)
-            {
-if (context.enableErrorChecking)
-{
-    trace("Creating sequential tristrip index buffer of size " + (requiredIndexCount * 2))
-}
-                match = new DataBuffer()
-                squentialTripStripIndexBufferPool[requiredIndexCount] = match
-
-                match.target = GL_ELEMENT_ARRAY_BUFFER
-                match.indicesSize = GL_UNSIGNED_SHORT
-                match.data.clear()
-
-                // THIS ONLY WORKS IF THE TRI STRIPS USE SEQUENTIAL VERTEX DATA!!!!
-                // Fill in the index buffer
-                //@todo. can we just fill in the newly required ones? Possibly faster...
-                match.data.position = 0
-                for (triIdx = 0; triIdx < triCount; triIdx += 2)
-                {
-                    match.data.writeShort(0 + triIdx)
-                    match.data.writeShort(1 + triIdx)
-                    match.data.writeShort(2 + triIdx)
-                    match.data.writeShort(2 + triIdx)
-                    match.data.writeShort(1 + triIdx)
-                    match.data.writeShort(3 + triIdx)
-                }
-                match.data.length = requiredIndexCount * 2
-                match.data.position = 0
-                match.size = requiredIndexCount * 2
-
-                // If we have an index buffer, dispose
-                if (match.indexBuffer != null)
-                {
-                    match.indexBuffer.dispose()
-                }
-
-                // Create a new index buffer
-                match.indexBuffer = context.createIndexBuffer(requiredIndexCount)
-                match.indexBuffer.uploadFromByteArray(match.data, 0, 0, requiredIndexCount)
-                // Clear the byte array
-                match.data.clear()
-                match.uploaded = true
-
-//if (context.enableErrorChecking)
-{
-                totalSequentialTriStripCacheSize += requiredIndexCount * 2
-                if (
-                    (totalSequentialTriStripCacheSize > (1024 * 1024 * 2))
-                    )
-                {
-                    trace("totalSequentialTriStripCacheSize = " + totalSequentialTriStripCacheSize)
-                }
-}
-            }
-            
-            return match
-}
-        }
     }
 }
-    import Stage3DGL.GLAPI;
-    import flash.display3D.*;
-    import flash.display3D.textures.*;
-    import flash.geom.*;
-    import flash.utils.*;
-    
-    class BufferPool    
+
+import Stage3DGL.GLAPI;
+import flash.display3D.*;
+import flash.display3D.textures.*;
+import flash.geom.*;
+import flash.utils.*;
+
+class BufferPool    
+{
+    public var framestamp:uint = 0
+    public var idx:uint = 0
+    public var buffers:Vector.<DataBuffer> = new Vector.<DataBuffer>()
+
+    public function getBuffer(fs:uint):DataBuffer
     {
-        public var framestamp:uint = 0
-        public var idx:uint = 0
-        public var buffers:Vector.<DataBuffer> = new Vector.<DataBuffer>()
-
-        public function getBuffer(fs:uint):DataBuffer
-        {
-            if(framestamp != fs) {
-                framestamp = fs
-                idx = 0
-            }
-
-            if(idx >= buffers.length)
-                buffers.push(new DataBuffer())
-
-            return buffers[idx++]            
+        if(framestamp != fs) {
+            framestamp = fs
+            idx = 0
         }
+
+        if(idx >= buffers.length)
+            buffers.push(new DataBuffer())
+
+        return buffers[idx++]            
     }
-        
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    internal class DataBuffer 
-    {
-        public var id:uint
-        public var target:uint
-        public var usage:uint
-        public var data:ByteArray
-        public var size:uint
-        public var indicesSize:uint
-        public var stride:uint
-        public var uploaded:Boolean
-        public var indexBuffer:IndexBuffer3D
-        public var vertexBuffer:VertexBuffer3D
-        public var inUse:Boolean
+}
+
+internal class DataBuffer 
+{
+    public var id:uint
+    public var target:uint
+    public var usage:uint
+    public var data:ByteArray
+    public var size:uint
+    public var indicesSize:uint
+    public var stride:uint
+    public var uploaded:Boolean
+    public var indexBuffer:IndexBuffer3D
+    public var vertexBuffer:VertexBuffer3D
+    public var inUse:Boolean
 
     public function DataBuffer() {
         data = new ByteArray()
         data.endian = "littleEndian"
     }
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class FrameBuffer 
-    {
-        public var colorTexture:Texture
-        public var enableDepthAndStencil:Boolean
-        public var lastClearFramestamp:uint
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class RenderBuffer 
-    {
-        public var backingTexture:Texture
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class TextureInstance
-    {
-        public var texture:Texture
-        public var cubeTexture:CubeTexture
-        public var mipLevels:uint
-        public var params:TextureParams = new TextureParams()
-        public var boundType:uint
-        public var texID:uint
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class TextureParams
-    {
-//        public var boundTexture:uint
-        public var GL_TEXTURE_MAX_ANISOTROPY_EXT:Number = -1
-        public var GL_TEXTURE_MAG_FILTER:Number = GLAPI.GL_LINEAR
-        public var GL_TEXTURE_MIN_FILTER:Number = GLAPI.GL_NEAREST_MIPMAP_LINEAR
+}
 
-        public var GL_TEXTURE_MIN_LOD:Number = -1000.0
-        public var GL_TEXTURE_MAX_LOD:Number = 1000.0
-        
-        public var GL_TEXTURE_WRAP_S:uint = GLAPI.GL_REPEAT
-        public var GL_TEXTURE_WRAP_T:uint = GLAPI.GL_REPEAT
+class FrameBuffer 
+{
+    public var colorTexture:Texture
+    public var enableDepthAndStencil:Boolean
+    public var lastClearFramestamp:uint
+}
 
-        public var GL_TEXTURE_ENV_MODE:uint = GLAPI.GL_MODULATE
+class RenderBuffer 
+{
+    public var backingTexture:Texture
+}
 
-//        public function clone():TextureParams
-//        {
-//            var result:TextureParams = new TextureParams()
-//
-//            result.boundTexture                             = this.boundTexture
-//            result.GL_TEXTURE_MAX_ANISOTROPY_EXT            = this.GL_TEXTURE_MAX_ANISOTROPY_EXT
-//            result.GL_TEXTURE_MAG_FILTER                    = this.GL_TEXTURE_MAG_FILTER
-//            result.GL_TEXTURE_MIN_FILTER                    = this.GL_TEXTURE_MIN_FILTER
-//            result.GL_TEXTURE_WRAP_S                        = this.GL_TEXTURE_WRAP_S
-//            result.GL_TEXTURE_WRAP_T                        = this.GL_TEXTURE_WRAP_T
-//
-//            return result
-//        }
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class VertexBufferAttribute
-    {
-        public var offset:uint
-        public var buffer:DataBuffer
-        public var stride:uint
-        public var size:uint
-        public var type:uint
-        public var normalize:Boolean
-        public var enabled:Boolean = false
-        public var isGeneric:Boolean = true
-    }
-    
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class ShaderInstance
-    {
-        public var shaderType:uint
-        public var source:String
-    }
-        
-    // ===========================================================================
-    //  Class
-    // ---------------------------------------------------------------------------
-    class ProgramInstance
-    {
-        public var program:Program3D
-        public var id:uint
-        public var vertexShader:ShaderInstance = null
-        public var fragmentShader:ShaderInstance = null
-        public var attributePositions:Dictionary = new Dictionary()
-        public var uniformPositions:Dictionary = new Dictionary()
-        public var attributeNames:Dictionary = new Dictionary()
-        public var uniformNames:Dictionary = new Dictionary()
-        public var positionsBuffer:DataBuffer
-        public var positionsOffset:uint = 0
-        public var textureCoordsBuffer:DataBuffer
-        public var textureCoordsOffset:uint = 0
-        public var lightMapCoordsOffset:uint = 0
-        public var activeSamplers:Vector.<Boolean> = new Vector.<Boolean>(8)
+class TextureInstance
+{
+    public var texture:Texture
+    public var cubeTexture:CubeTexture
+    public var mipLevels:uint
+    public var params:TextureParams = new TextureParams()
+    public var boundType:uint
+    public var texID:uint
+}
 
+class TextureParams
+{
+    public var GL_TEXTURE_MAX_ANISOTROPY_EXT:Number = -1
+    public var GL_TEXTURE_MAG_FILTER:Number = GLAPI.GL_LINEAR
+    public var GL_TEXTURE_MIN_FILTER:Number = GLAPI.GL_NEAREST_MIPMAP_LINEAR
+    public var GL_TEXTURE_MIN_LOD:Number = -1000.0
+    public var GL_TEXTURE_MAX_LOD:Number = 1000.0
+    public var GL_TEXTURE_WRAP_S:uint = GLAPI.GL_REPEAT
+    public var GL_TEXTURE_WRAP_T:uint = GLAPI.GL_REPEAT
+    public var GL_TEXTURE_ENV_MODE:uint = GLAPI.GL_MODULATE
+}
+
+class VertexBufferAttribute
+{
+    public var offset:uint
+    public var buffer:DataBuffer
+    public var stride:uint
+    public var size:uint
+    public var type:uint
+    public var normalize:Boolean
+    public var enabled:Boolean = false
+    public var isGeneric:Boolean = true
+}
+
+class ProgramInstance
+{
+    public var program:Program3D
+    public var id:uint
+    public var activeSamplers:Vector.<Boolean> = new Vector.<Boolean>(8)
     public var vertexConstantsDirty:Boolean = true
-        public var vertexConstantsData:Vector.<Number> = new Vector.<Number>()
+    public var vertexConstantsData:Vector.<Number> = new Vector.<Number>()
     public var fragmentConstantsDirty:Boolean = true
-        public var fragmentConstantsData:Vector.<Number> = new Vector.<Number>(4)
+    public var fragmentConstantsData:Vector.<Number> = new Vector.<Number>(4)
+    public var vertexStreamIndicies:Vector.<Boolean> = new Vector.<Boolean>(128)
 
     public function updateConstants(context:Context3D):void
     {
         if (vertexConstantsDirty && vertexConstantsData.length) {
-//                 if (id == 1)
-//                 {
-//                     trace("Vertex Data Length: " + vertexConstantsData.length)
-//                     for (var i:int = 0; i < vertexConstantsData.length; i++)
-//                         trace("Value at " + i + ": " + vertexConstantsData[i])
-//                 }
                     context.setProgramConstantsFromVector( Context3DProgramType.VERTEX, 0, vertexConstantsData)
             vertexConstantsDirty = false
         }
         if (fragmentConstantsDirty && fragmentConstantsData.length) {
-//                 if (id == 1)
-//                 {
-//                     trace("Fragment Data Length: " + fragmentConstantsData.length)
-//                     for (var i:int = 0; i < fragmentConstantsData.length; i++)
-//                         trace("Value at " + i + ": " + fragmentConstantsData[i])
-//                 }
                     context.setProgramConstantsFromVector( Context3DProgramType.FRAGMENT, 0, fragmentConstantsData)
             fragmentConstantsDirty = false
         }
     }
-        
-        public var vertexShaderVars:Dictionary
-    public var vertexStreamIndicies:Vector.<Boolean> = new Vector.<Boolean>(128)
-        public var fragmentShaderVars:Dictionary
+}
 
-        public var lightMapCoordinateScaleBias:Vector.<Number>
-        
-        public var hasLocalToWorld:Boolean = false
-        public var hasLocalToProjection:Boolean = false
-        public var hasViewProjection:Boolean = false
-        public var hasTextureCoords:Boolean = false
-        public var hasLightmapCoords:Boolean = false
-        public var hasPositions:Boolean = false
-        public var hasBasicFragmentShader:Boolean = false
-        public var hasLightMap:Boolean = false
-        public var hasBaseTexture:Boolean = false
-    }
-
-// ===========================================================================
-//  Class
-// ---------------------------------------------------------------------------
-//class GLDisplayList
-//{
-//    public var executeOnCompile:Boolean = false
-//    public var vertexBuffer:VertexBuffer3D
-//    public var indexBuffer:IndexBuffer3D
-//    public var program:FixedFunctionProgramInstance
-//    public var textureSamplers:Vector.<uint> = new Vector.<uint>(8)
-//
-//    // For debugging:
-//    public var vertexData:Vector.<Number>
-//    public var indexData:Vector.<uint>
-//}
-
-
-// ===========================================================================
-//  Class
-// ---------------------------------------------------------------------------
 class VertexBufferBuilder
 {
-    // FIXME (egeorgie): optimize
-    public var mode:uint
-    //public var data:Vector.<Number>
-//    public var tx:Vector.<Number>
-//    public var pos:Vector.<Number>
-//    public var color:Vector.<Number>
-//    public var normal:Vector.<Number>
-    
-    // position
-    public var x:Number = 0
-    public var y:Number = 0
-    public var z:Number = 0
-    
-    // color
-    public var r:Number = 1
-    public var g:Number = 1
-    public var b:Number = 1
-    public var a:Number = 1
-    
-    // normal
-    public var nx:Number = 0
-    public var ny:Number = 0
-    public var nz:Number = 0
-    
-    // texture
-    public var tx:Number = 0
-    public var ty:Number = 0
-   
-    public var flags:uint = 0
-    
     public static const HAS_COLOR:uint      = 0x00000001
     public static const HAS_TEXTURE2D:uint  = 0x00000002
     public static const HAS_NORMAL:uint     = 0x00000004
     public static const TEX_GEN_S_SPHERE:uint   = 0x00000008
     public static const TEX_GEN_T_SPHERE:uint   = 0x00000010
-    
-    //public var dataVector:Vector.<Number> = new Vector.<Number>()
-    public var data:ByteArray
-    public var count:int
-    
-    public function VertexBufferBuilder()
-    {
-        data = new ByteArray()
-        data.endian = "littleEndian"
-    }
-    
-    public function reset():void
-    {
-        // No need to reset vertex, as those will always be fully defined?
-//        x = y = z = 0
-//        r = g = b = a = 1
-//        nz = ny = nz = tx = ty = 0
-        flags = 0
-        data.position = 0
-        count = 0
-
-//        dataVector.length = 0
-    }
-    
-    public function push():void
-    {
-//        if ((flags & HAS_TEXTURE2D) != 0)
-//            trace("glVertex("+ x + ", " + y + ", " + z + ", tx = " + tx + ", ty = " + ty + ")")
-//        else 
-//            trace("glVertex("+ x + ", " + y + ", " + z + ")")
-        
-        // FIXME (egeorgie): optimize
-  //      dataVector.push(x, y, z, r, g, b, a, nx, ny, nz, tx, ty)
-        data.writeFloat(x)
-        data.writeFloat(y)
-        data.writeFloat(z)
-        data.writeFloat(r)
-        data.writeFloat(g)
-        data.writeFloat(b)
-        data.writeFloat(a)
-        data.writeFloat(nx)
-        data.writeFloat(ny)
-        data.writeFloat(nz)
-        data.writeFloat(tx)
-        data.writeFloat(ty)
-        ++count
-    }
-    
 }
 
-
-// ===========================================================================
-//  Class
-// ---------------------------------------------------------------------------
 class FixedFunctionProgramInstance
 {
     public var program:Program3D
@@ -5114,9 +2702,6 @@ class FixedFunctionProgramInstance
     public var key:String
 }
 
-// ===========================================================================
-//  Class
-// ---------------------------------------------------------------------------
 class TraceLog
 {
     public function send(value:String):void
@@ -5124,7 +2709,6 @@ class TraceLog
         trace(value)
     }
 }
-
 
 /**
  *  Represents the vertices as defined between calls of glBeing() and glEnd().
@@ -5134,7 +2718,6 @@ class VertexStream
 {
     public var vertexBuffer:VertexBuffer3D
     public var indexBuffer:IndexBuffer3D
-//    public var triangleCount:int
     public var vertexFlags:uint
     public var program:FixedFunctionProgramInstance
     public var polygonOffset:Boolean = false
@@ -5242,23 +2825,15 @@ class Material
         clone.emission = (emission) ? emission.concat() : null
         return clone
     }
-    
 }
 
 class LightingState
 {
     public var enableColorMaterial:Boolean // GL_COLOR_MATERIAL enable bit
-    // ignore GL_COLOR_MATERIAL_FACE value
-    // ignore Color material parameters that are tracking the current color
-    // ignore Ambient scene color
-    // ignore GL_LIGHT_MODEL_LOCAL_VIEWER value
-    // ignore GL_LIGHT_MODEL_TWO_SIDE setting
     public var enableLighting:Boolean // GL_LIGHTING enable bit
     public var lightsEnabled:Vector.<Boolean>
     public var lights:Vector.<Light>
     public var contextMaterial:Material
-    // ignore GL_SHADE_MODEL
-    
 }
 
 class BufferNode
@@ -5268,10 +2843,7 @@ class BufferNode
     public var next:int
     public var count:uint
     public var hash:uint
-    // Debug:
-    // public var src:ByteArray
 }
-
 
 class VertexBufferPool
 {
