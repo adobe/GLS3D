@@ -62,6 +62,24 @@ package Stage3DGL
         public var context:Context3D
         public var genOnBind:Boolean = false
 
+        private const consts:Vector.<Number> = new <Number>[0.0, 0.5, 1.0, 2.0]
+        private const zeroes:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
+
+        // bit 0 = whether textures are enabled
+        private const ENABLE_TEXTURE_OFFSET:uint = 0
+        // bits 1-6 = whether clip planes 0-5 are enabled
+        private const ENABLE_CLIPPLANE_OFFSET:uint = 1
+        // bit 7 = whether color material is enabled
+        private const ENABLE_COLOR_MATERIAL_OFFSET:uint = 7
+        // bit 8 = whether lighting is enabled
+        private const ENABLE_LIGHTING_OFFSET:uint = 8
+        // bit 9-16 = whether lights 0-7 are enabled
+        private const ENABLE_LIGHT_OFFSET:uint = 9
+        // bit 17 = whether specular is separate
+        private const ENABLE_SEPSPEC_OFFSET:uint = 17
+        // bit 18 = whether polygon offset is enabled
+        private const ENABLE_POLYGON_OFFSET:uint = 18
+
         private var _stage:Stage
         private var overrideR:uint
         private var overrideG:uint
@@ -80,9 +98,7 @@ package Stage3DGL
         private var frontFaceClockWise:Boolean = false // we default to CCW
         private var glCullMode:uint = GL_BACK
         private var lightingStates:Vector.<LightingState> = new Vector.<LightingState>()
-        private static var texID:uint = 1 // so we have 0 as non-valid id
-        private const consts:Vector.<Number> = new <Number>[0.0, 0.5, 1.0, 2.0]
-        private const zeroes:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
+        private var texID:uint = 1 // so we have 0 as non-valid id
         private var shininessVec:Vector.<Number> = new <Number>[0.0, 0.0, 0.0, 0.0]
         private var globalAmbient:Vector.<Number> = new <Number>[0.2, 0.2, 0.2, 1]
         private var polygonOffsetValue:Number = -0.0005
@@ -124,24 +140,15 @@ package Stage3DGL
         private var vertexAttributesDirty:Boolean = true
         private var activeCommandList:CommandList = null
         private var commandLists:Vector.<CommandList> = null
-        private var dataBuffers:Dictionary = new Dictionary()
-        private var frameBuffers:Dictionary = new Dictionary()
-        private var renderBuffers:Dictionary = new Dictionary()
-        private var programs:Dictionary = new Dictionary()
-        private var shaders:Dictionary = new Dictionary()
         private var textures:Dictionary = new Dictionary()
         private var vertexBufferAttributes:Vector.<VertexBufferAttribute> = new Vector.<VertexBufferAttribute>(8)
         private var textureUnits:Array = new Array(32)
         private var activeProgram:ProgramInstance
         private var activeTextureUnit:uint = 0
-
         private var activeTexture:TextureInstance
         private var textureSamplers:Vector.<TextureInstance> = new Vector.<TextureInstance>(8)
         private var textureSamplerIDs:Vector.<uint> = new Vector.<uint>(8)
         private var framestamp:uint = 1
-        private var vertexBufferPool:Dictionary = new Dictionary()
-        private var indexBufferPool:Dictionary = new Dictionary()
-        private var squentialTripStripIndexBufferPool:Dictionary = new Dictionary()
         private var offsetFactor:Number = 0.0
         private var offsetUnits:Number = 0.0
         private var glStateFlags:uint = 0
@@ -151,22 +158,6 @@ package Stage3DGL
         private var projectionStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
         private var textureStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
         private var currentMatrixStack:Vector.<Matrix3D> = modelViewStack
- 
-        // bit 0 = whether textures are enabled
-        private const ENABLE_TEXTURE_OFFSET:uint = 0
-        // bits 1-6 = whether clip planes 0-5 are enabled
-        private const ENABLE_CLIPPLANE_OFFSET:uint = 1
-        // bit 7 = whether color material is enabled
-        private const ENABLE_COLOR_MATERIAL_OFFSET:uint = 7
-        // bit 8 = whether lighting is enabled
-        private const ENABLE_LIGHTING_OFFSET:uint = 8
-        // bit 9-16 = whether lights 0-7 are enabled
-        private const ENABLE_LIGHT_OFFSET:uint = 9
-        // bit 17 = whether specular is separate
-        private const ENABLE_SEPSPEC_OFFSET:uint = 17
-        // bit 18 = whether polygon offset is enabled
-        private const ENABLE_POLYGON_OFFSET:uint = 18
-
         private var contextMaterial:Material = new Material(true)
 
         public static function init(context:Context3D, log:Object, stage:Stage):void
@@ -975,6 +966,11 @@ package Stage3DGL
             }
         }
 
+        public function glGenBuffers(count:uint, dataPtr:uint):void
+        {
+            
+        }
+
         public function glEndVertexData(count:uint, mode:uint, data:ByteArray, dataPtr:uint, dataHash:uint, flags:uint):void
         {
             // FIXME: build an actual VertexBuffer3D
@@ -1662,9 +1658,6 @@ package Stage3DGL
         {
             if (log) log.send( "glClear called with " + mask)
 
-            // trace("validateFramebufferState from glClear")
-            //validateFramebufferState(false)
-
             contextClearMask = 0
             if (mask & GL_COLOR_BUFFER_BIT) contextClearMask |= Context3DClearMask.COLOR
             if (mask & GL_STENCIL_BUFFER_BIT) contextClearMask |= Context3DClearMask.STENCIL
@@ -1680,13 +1673,6 @@ package Stage3DGL
                 context.clear(contextClearR, contextClearG, contextClearB, contextClearA,
                     contextClearDepth, contextClearStencil, contextClearMask)
             }
-
-            // If this is a render texture, keep track of the last frame it was cleared
-            /*if (activeFrameBuffer != null)
-            {
-                // trace( "    clear targeted an offscreen texture")
-                activeFrameBuffer.lastClearFramestamp = framestamp
-            }*/
 
             // Make sure the vertex buffer pool knows it's next frame already to enable recycling
             immediateVertexBuffers.nextFrame()
@@ -2613,18 +2599,6 @@ internal class DataBuffer
         data = new ByteArray()
         data.endian = "littleEndian"
     }
-}
-
-class FrameBuffer 
-{
-    public var colorTexture:Texture
-    public var enableDepthAndStencil:Boolean
-    public var lastClearFramestamp:uint
-}
-
-class RenderBuffer 
-{
-    public var backingTexture:Texture
 }
 
 class TextureInstance

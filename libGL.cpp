@@ -806,6 +806,18 @@ inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElement
     glEnd();
 }
 
+extern void glGenBuffers (GLsizei n, GLuint *buffers)
+{
+    inline_as3("import Stage3DGL.GLAPI;\n"\
+               "GLAPI.instance.glGenBuffers(%0, %1);" :  : "r"(n), "r"(buffers));
+}
+
+extern void glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage)
+{
+    inline_as3("import Stage3DGL.GLAPI;\n"\
+               "GLAPI.instance.glBufferData(%0, %1);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
+}
+
 extern void glColorPointer (GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
 {
     AState.colors.size = size;
@@ -3919,20 +3931,6 @@ extern void glDeleteBuffers (GLsizei n, const GLuint *buffers)
 {
     if(stubMsg) {
         fprintf(stderr, "stubbed glDeleteBuffers...\n");
-    }
-}
-
-extern void glGenBuffers (GLsizei n, GLuint *buffers)
-{
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glGenBuffers...\n");
-    }
-}
-
-extern void glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage)
-{
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glBufferData...\n");
     }
 }
 
