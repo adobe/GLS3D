@@ -163,7 +163,7 @@ public:
             hashSum *= prime;
         }
 
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
                    "GLAPI.instance.glEndVertexData(%0, %1, ram, %2, %3, %4);\n" :: "r"(count), "r"(mode), "r"(pBuffer), "r"(hashSum), "r"(flags));
     }
 
@@ -208,13 +208,13 @@ extern void glTexCoord2f (GLfloat s, GLfloat t)
 
 extern void glRotatef (GLfloat angle, GLfloat x, GLfloat y, GLfloat z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glRotate(%0, %1, %2, %3);\n" : : "r"(angle), "r"(x), "r"(y), "r"(z));
 }
 
 extern void glRotated (GLdouble angle, GLdouble x, GLdouble y, GLdouble z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glRotate(%0, %1, %2, %3);\n" : : "r"(angle), "r"(x), "r"(y), "r"(z));
 }
 
@@ -230,27 +230,27 @@ extern void glBegin (GLenum mode)
 
 extern void glClear (GLbitfield mask)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glClear(%0);\n" : : "r"(mask));
 }
 
 extern void glClearColor (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glClearColor(%0, %1, %2, %3);\n"
            : : "r"(red), "r"(green), "r"(blue), "r"(alpha) );
 }
 
 extern void glClearDepth (GLclampd depth)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glClearDepth(%0);\n"
            : : "r"(depth) );
 }
 
 extern void glClearStencil (GLint s)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glClearStencil(%0);\n"
            : : "r"(s) );
 }
@@ -278,7 +278,7 @@ extern void glColor3fv (const GLfloat *v)
     float fb = (float)v[2];
     float fa = (float)1.0f;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
@@ -290,7 +290,7 @@ extern void glColor4ubv (const GLubyte *v)
     float fb = (float)v[2] / 255.0f;
     float fa = (float)v[3] / 255.0f;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
@@ -302,7 +302,7 @@ extern void glColor4ub (GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha)
     float fb = (float)blue / 255.0f;
     float fa = (float)alpha / 255.0f;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
@@ -424,112 +424,112 @@ extern void gluLookAt( GLdouble eyex, GLdouble eyey, GLdouble eyez,
 
 extern void glShadeModel (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glShadeModel(%0);" : : "r"(mode));
 }
 
 extern GLenum glGetError (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glGetError not yet implemented.');");
     return GL_NO_ERROR;
 }
 
 extern void glTexEnvf (GLenum target, GLenum pname, GLfloat param)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexEnvf(%0, %1, %2);\n" : : "r"(target), "r"(pname), "r"(param));
 }
 
 extern void glOrtho (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble zNear, GLdouble zFar)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glOrtho(%0, %1, %2, %3, %4, %5)\n" : : "r"(left),"r"(right),"r"(bottom),"r"(top),"r"(zNear),"r"(zFar));
 }
 
 extern void glLoadIdentity (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glLoadIdentity()\n");
 }
 
 extern void glPushMatrix (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glPushMatrix()\n");
 }
 
 extern void glViewport (GLint x, GLint y, GLsizei width, GLsizei height)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glViewport not yet implemented.');");
 }
 
 extern void glBlendFunc (GLenum sfactor, GLenum dfactor)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glBlendFunc(%0, %1)\n" :: "r"(sfactor), "r"(dfactor));
 }
 
 extern void glEnable (GLenum cap)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glEnable(%0)\n" :: "r"(cap));
 }
 
 extern void glDisable (GLenum cap)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glDisable(%0)\n" :: "r"(cap));
 }
 
 extern void glPushAttrib (GLbitfield mask)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glPushAttrib(%0)\n" :: "r"(mask));
 }
 
 extern void glPopAttrib (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glPopAttrib()\n");
 }
 
 extern void glPopMatrix (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glPopMatrix()\n");
 }
 
 extern void glMatrixMode (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glMatrixMode(%0)\n" : : "r"(mode));
 }
 
 extern void glTexImage2D (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexImage2D(%0, %1, %2, %3, %4, %5, %6, %7, %8, ram);\n" : :
                "r"(target), "r"(level), "r"(internalformat), "r"(width), "r"(height), "r"(border), "r"(format), "r"(type), "r"(pixels));
 }
 
 extern void glTexSubImage2D (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexSubImage2D(%0, %1, %2, %3, %4, %5, %6, %7, %8, ram);\n" : :
                "r"(target), "r"(level), "r"(xoffset), "r"(yoffset), "r"(width), "r"(height), "r"(format), "r"(type), "r"(pixels));
 }
 
 extern void glTexParameteri (GLenum target, GLenum pname, GLint param)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexParameteri(%0, %1, %2);\n" : : "r"(target), "r"(pname), "r"(param));
 }
 
 extern void glTexParameterf (GLenum target, GLenum pname, GLfloat param)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexParameterf(%0, %1, %2);\n" : : "r"(target), "r"(pname), "r"(param));
 }
 
@@ -540,7 +540,7 @@ extern void glTexParameterfv (GLenum target, GLenum pname, const GLfloat *params
         // do we care?
         break;
     default:
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('glTexParameterfv: ' + %0 + ','+ %1 + ','+ %2);\n" : : "r"(target), "r"(pname), "r"(params[0]));
         break;
     }
@@ -548,13 +548,13 @@ extern void glTexParameterfv (GLenum target, GLenum pname, const GLfloat *params
 
 extern void glBindTexture (GLenum target, GLuint texture)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glBindTexture(%0, %1);\n" : : "r"(target), "r"(texture));
 }
 
 extern void glActiveTexture (GLenum texture)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glActiveTexture(%0);\n" : : "r"(texture));
 }
 
@@ -563,7 +563,7 @@ extern void glGenTextures (GLsizei n, GLuint *textures)
     int i;
     unsigned firstIndex;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "var result:uint = GLAPI.instance.glGenTextures(%0);\n" :: "r"(n));
     AS3_CopyAS3ToC(result, firstIndex);
 
@@ -590,7 +590,7 @@ struct ArrayEXTState {
 
 extern void glClientActiveTexture (GLenum texture)
 {
-    ///inline_as3("import Stage3DGL.GLAPI;\n"\
+    ///inline_as3("import GLS3D.GLAPI;\n"\
     //         "GLAPI.instance.send('stubbed glClientActiveTexture '  +%0);\n" : : "r"(texture));
 }
 
@@ -607,7 +607,7 @@ extern void glEnableClientState (GLenum array)
         AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled = GL_TRUE;
         break;
     default:
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('stubbed glEnableClientState '  +%0);\n" : : "r"(array));
         break;
     }
@@ -626,7 +626,7 @@ extern void glDisableClientState (GLenum array)
         AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled = GL_FALSE;
         break;
     default:
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('stubbed glDisableClientState '  +%0);\n" : : "r"(array));
         break;
     }
@@ -667,7 +667,7 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
             if(type == GL_UNSIGNED_INT) {
                 i = ((GLuint*)indices)[e];
             } else if(verboseDebug) {
-                inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte indicies');\n");
+                inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte indicies');\n");
             }
 
             if(AState.colors.enabled) {
@@ -676,7 +676,7 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
                     cptr = getUBytePtr(AState.colors.ptr, max(AState.colors.stride, AState.colors.size), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
                     }
                 }
 
@@ -689,7 +689,7 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
                     tptr = getFloatPtr(AState.texcoords[activeTextureUnit - GL_TEXTURE0].ptr, max(AState.texcoords[activeTextureUnit - GL_TEXTURE0].stride, AState.texcoords[activeTextureUnit - GL_TEXTURE0].size*sizeof(GLfloat)), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
                     }
                 }
 
@@ -702,7 +702,7 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
                     vptr = getFloatPtr(AState.verts.ptr, max(AState.verts.stride, AState.verts.size*sizeof(GLfloat)), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
                     }
                 }
                 switch(AState.verts.size) {
@@ -714,7 +714,7 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
                     break;
                 default:
                     if(verboseDebug) {
-inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
+inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
                     }
                     break;
                 }
@@ -723,10 +723,10 @@ inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements unk
         break;
     default:
         if(verboseDebug) {
-            inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
+            inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
         }
         if(verboseDebug) {
-inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(mode), "r"(count), "r"(type), "r"(indices));
+inline_as3("import GLS3D.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(mode), "r"(count), "r"(type), "r"(indices));
         }
         break;
     }
@@ -748,7 +748,7 @@ extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
                     cptr = getUBytePtr(AState.colors.ptr, max(AState.colors.stride, AState.colors.size), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
                     }
                 }
 
@@ -761,7 +761,7 @@ extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
                     tptr = getFloatPtr(AState.texcoords[activeTextureUnit - GL_TEXTURE0].ptr, max(AState.texcoords[activeTextureUnit - GL_TEXTURE0].stride, AState.texcoords[activeTextureUnit - GL_TEXTURE0].size*sizeof(GLfloat)), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
                     }
                 }
 
@@ -774,7 +774,7 @@ extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
                     vptr = getFloatPtr(AState.verts.ptr, max(AState.verts.stride, AState.verts.size*sizeof(GLfloat)), i);
                 } else {
                     if(verboseDebug) {
-                        inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
+                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
                     }
                 }
                 switch(AState.verts.size) {
@@ -786,7 +786,7 @@ extern void glDrawArrays (GLenum mode, GLint first, GLsizei count)
                     break;
                 default:
                     if(verboseDebug) {
-inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
+inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
                     }
                     break;
                 }
@@ -795,10 +795,10 @@ inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements unk
         break;
     default:
         if(verboseDebug) {
-            inline_as3("import Stage3DGL.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
+            inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
         }
         if(verboseDebug) {
-inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',');\n" : : "r"(mode), "r"(count));
+inline_as3("import GLS3D.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',');\n" : : "r"(mode), "r"(count));
         }
         break;
     }
@@ -808,13 +808,13 @@ inline_as3("import Stage3DGL.GLAPI;\n GLAPI.instance.send('stubbed glDrawElement
 
 extern void glGenBuffers (GLsizei n, GLuint *buffers)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glGenBuffers(%0, %1);" :  : "r"(n), "r"(buffers));
 }
 
 extern void glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glBufferData(%0, %1);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
 }
 
@@ -844,19 +844,19 @@ extern void glTexCoordPointer (GLint size, GLenum type, GLsizei stride, const GL
 
 extern void glReadPixels (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glReadPixels not yet implemented.');");
 }
 
 extern void glGetIntegerv (GLenum pname, GLint *params)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glGetIntegerv(%0, ram, %1);\n" : : "r"(pname), "r"(params));
 }
 
 extern void glGetFloatv (GLenum pname, GLfloat *params)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glGetFloatv(%0, ram, %1);\n" : : "r"(pname), "r"(params));
 }
 
@@ -870,50 +870,50 @@ extern void glVertex2f (GLfloat x, GLfloat y)
 
 extern void glMultMatrixf (const GLfloat *m)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "ram.position = %0;" \
                "GLAPI.instance.glMultMatrix(ram, true /*floatArray*/);\n":: "r"(m));
 }
 
 extern void glDepthMask (GLboolean flag)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glDepthMask(%0);\n" : : "r"(flag));
 }
 
 extern void glDepthFunc (GLenum func)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glDepthFunc(%0);\n" : : "r"(func));
 }
 
 extern void glCallList (GLuint list)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glCallList(%0)\n" : : "r"(list));
 }
 
 extern void glTranslatef (GLfloat x, GLfloat y, GLfloat z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTranslate(%0, %1, %2);\n" : : "r"(x), "r"(y), "r"(z));
 }
 
 extern void glTranslated (GLdouble x, GLdouble y, GLdouble z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTranslate(%0, %1, %2);\n" : : "r"(x), "r"(y), "r"(z));
 }
 
 extern void glEndList (void)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glEndList()\n" : :);
 }
 
 extern void glNewList (GLuint list, GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glNewList(%0, %1)\n" : : "r"(list), "r"(mode));
 }
 
@@ -921,7 +921,7 @@ extern GLuint glGenLists (GLsizei range)
 {
     GLuint retVal;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "var result:uint = GLAPI.instance.glGenLists(%0);\n" : : "r"(range));
     AS3_CopyAS3ToC(result, retVal);
 
@@ -930,19 +930,19 @@ extern GLuint glGenLists (GLsizei range)
 
 extern void glPolygonOffset (GLfloat factor, GLfloat units)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glPolygonOffset(%0, %1);\n" : : "r"(factor), "r"(units));
 }
 
 extern void glLightModeli (GLenum pname, GLint param)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glLightModeli(%0, %1);\n" : : "r"(pname), "r"(param));
 }
 
 extern void glTexGeni (GLenum coord, GLenum pname, GLint param)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glTexGeni(%0, %1, %2);\n" : : "r"(coord), "r"(pname), "r"(param));
 }
 
@@ -962,7 +962,7 @@ extern void glMaterialfv (GLenum face, GLenum pname, const GLfloat *params)
         fa = (float)params[3];
     }
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glMaterial(%0, %1, %2, %3, %4, %5);\n" : : "r"(face), "r"(pname), "r"(fr), "r"(fg), "r"(fb), "r"(fa));
 }
 
@@ -991,32 +991,32 @@ extern void glTexCoord2fv (const GLfloat *v)
 
 extern void glScissor (GLint x, GLint y, GLsizei width, GLsizei height)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glScissor(%0, %1, %2, %3);\n" : : "r"(x), "r"(y), "r"(width), "r"(height));
 }
 
 extern void glDeleteLists (GLuint list, GLsizei range)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glDeleteLists not yet implemented.');");
 }
 
 extern GLboolean glIsList (GLuint list)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glIsList not yet implemented.');");
 }
 
 extern void glDeleteTextures (GLsizei n, const GLuint *textures)
 {
     for(int i=0; i<n; i++)
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glDeleteTexture(%0);\n" :  : "r"(textures[i]));
 }
 
 extern GLboolean glIsTexture (GLuint texture)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glIsTexture not yet implemented.');");
 }
 
@@ -1027,20 +1027,20 @@ extern void glColor4f (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
     float fb = (float)blue;
     float fa = (float)alpha;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
 
 extern void glScalef (GLfloat x, GLfloat y, GLfloat z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glScale(%0, %1, %2);\n" : : "r"(x), "r"(y), "r"(z));
 }
 
 extern void glScaled (GLdouble x, GLdouble y, GLdouble z)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glScale(%0, %1, %2);\n" : : "r"(x), "r"(y), "r"(z));
 }
 
@@ -1067,7 +1067,7 @@ extern void glColor3f (GLfloat red, GLfloat green, GLfloat blue)
     float fb = (float)blue;
     float fa = (float)1.0f;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
@@ -1079,7 +1079,7 @@ extern void glColor3d (GLdouble red, GLdouble green, GLdouble blue)
     float fb = (float)blue;
     float fa = (float)1.0f;
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
@@ -1101,14 +1101,14 @@ extern void glColor4fv (const GLfloat *v)
     float fb = (float)v[2];
     float fa = (float)v[3];
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColor(%0, %1, %2, %3);\n" : : "r"(fr), "r"(fg), "r"(fb), "r"(fa));
     vbb.glColor(fr, fg, fb, fa);
 }
 
 extern void glReadBuffer (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glReadBuffer not yet implemented.');");
 }
 
@@ -1131,7 +1131,7 @@ extern const GLubyte * glGetString (GLenum name)
     case GL_EXTENSIONS:
         return (const GLubyte*)GL_EXTENSIONS_str;
     default:
-        inline_as3("import Stage3DGL.GLAPI;\n"\
+        inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('glGetString not yet implemented. for ' + %0);" :  : "r"(name));
     }
     return (const GLubyte*)GL_default_str;
@@ -1139,14 +1139,14 @@ extern const GLubyte * glGetString (GLenum name)
 
 extern void glMultMatrixd (const GLdouble *m)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "ram.position = %0;"\
                "GLAPI.instance.glMultMatrix(ram, false /*floatArray*/);\n" :: "r"(m));
 }
 
 extern void glLoadMatrixf (const GLfloat *m)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "ram.position = %0;"\
                "GLAPI.instance.glLoadMatrix(ram, true /*floatArray*/);\n" :: "r"(m));
 }
@@ -1176,31 +1176,31 @@ extern void glFrustum (GLdouble left, GLdouble right, GLdouble bottom, GLdouble 
 
 extern void glDrawBuffers (GLsizei n, const GLenum *bufs)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.send('glDrawBuffers not yet implemented.');");
 }
 
 extern void glFrontFace (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glFrontFace(%0);\n" : : "r"(mode));
 }
 
 extern void glColorMask (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColorMask(%0, %1, %2, %3);\n" : : "r"(red), "r"(green), "r"(blue), "r"(alpha));
 }
 
 extern void glStencilOp (GLenum fail, GLenum zfail, GLenum zpass)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glStencilOp(%0, %1, %2);\n" : : "r"(fail), "r"(zfail), "r"(zpass));
 }
 
 extern void glStencilFunc (GLenum func, GLint ref, GLuint mask)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glStencilFunc(%0, %1, %2);\n" : : "r"(func), "r"(ref), "r"(mask));
 }
 
@@ -1210,7 +1210,7 @@ extern void glClipPlane (GLenum plane, const GLdouble *equation)
     double b = equation[1];
     double c = equation[2];
     double d = equation[3];
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glClipPlane(%0, %1, %2, %3, %4);\n" : : "r"(plane), "r"(a), "r"(b), "r"(c), "r"(d));
 }
 
@@ -1232,31 +1232,31 @@ extern void glLightfv (GLenum light, GLenum pname, const GLfloat *params)
         fa = (float)params[3];
     }
 
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glLight(%0, %1, %2, %3, %4, %5);\n" : : "r"(light), "r"(pname), "r"(fr), "r"(fg), "r"(fb), "r"(fa));
 }
 
 extern void glPolygonMode (GLenum face, GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glPolygonMode(%0, %1);\n" : : "r"(face), "r"(mode));
 }
 
 extern void glDrawBuffer (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('glDrawBuffer not yet implemented: ' + %0);" :  : "r"(mode));
 }
 
 extern void glCullFace (GLenum mode)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glCullFace(%0);\n" : : "r"(mode));
 }
 
 extern void glAlphaFunc (GLenum func, GLclampf ref)
 {
-    inline_as3("import Stage3DGL.GLAPI;\n"\
+    inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glAlphaFunc(%0, %1);\n" : : "r"(func), "r"(ref));
 }
 

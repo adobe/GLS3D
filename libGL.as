@@ -30,10 +30,9 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-package Stage3DGL
+package GLS3D
 {
-    import com.adobe.utils.*;
-    import com.adobe.utils.macro.*;
+    
     
     import flash.display.*;
     import flash.display3D.*;
@@ -46,6 +45,10 @@ package Stage3DGL
     import flash.text.TextFieldType;
     import flash.trace.Trace;
     import flash.utils.*;
+
+    import com.adobe.utils.*;
+    import com.adobe.utils.macro.*;
+    import com.adobe.alchemy.CModule; 
 
     // Linker trickery
     [Csym("D", "___libgl_abc__", ".data")]
@@ -148,6 +151,7 @@ package Stage3DGL
         private var activeTexture:TextureInstance
         private var textureSamplers:Vector.<TextureInstance> = new Vector.<TextureInstance>(8)
         private var textureSamplerIDs:Vector.<uint> = new Vector.<uint>(8)
+        private var vertexBufferObjects:Vector.<VertexBuffer3D> = new Vector.<VertexBuffer3D>()
         private var framestamp:uint = 1
         private var offsetFactor:Number = 0.0
         private var offsetUnits:Number = 0.0
@@ -968,7 +972,21 @@ package Stage3DGL
 
         public function glGenBuffers(count:uint, dataPtr:uint):void
         {
-            
+            if(count != 1)
+                throw "unimplemented"
+
+            vertexBufferObjects.push(null); // will be created for real by glBufferData
+            CModule.write32(dataPtr, vertexBufferObjects.length - 1);
+        }
+
+        //GLAPI.instance.glBufferData(%0, %1);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
+
+        public function glBufferData(target:uint, size:uint, dataPtr:uint, usage:uint):void
+        {
+            if(target != GL_ARRAY_BUFFER)
+                throw "unimplemented"
+
+               
         }
 
         public function glEndVertexData(count:uint, mode:uint, data:ByteArray, dataPtr:uint, dataHash:uint, flags:uint):void
@@ -1652,6 +1670,9 @@ package Stage3DGL
 
             //this.log = new TraceLog()
             this.context = context
+
+            // id zero is null
+            vertexBufferObjects.push(null);
         }
 
         public function glClear(mask:uint):void
@@ -2555,7 +2576,7 @@ package Stage3DGL
     }
 }
 
-import Stage3DGL.GLAPI;
+import GLS3D.GLAPI;
 import flash.display3D.*;
 import flash.display3D.textures.*;
 import flash.geom.*;
