@@ -234,6 +234,12 @@ extern void glClear (GLbitfield mask)
            "GLAPI.instance.glClear(%0);\n" : : "r"(mask));
 }
 
+extern void glDebugCube() {
+  fprintf(stderr, "glDebugCube!!!\n");
+  inline_as3("import GLS3D.GLAPI;\n"\
+               "GLAPI.instance.glDebugCube();\n");
+}
+
 extern void glClearColor (GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha)
 {
     inline_as3("import GLS3D.GLAPI;\n"\

@@ -32,8 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package GLS3D
 {
-    
-    
     import flash.display.*;
     import flash.display3D.*;
     import flash.display3D.textures.*;
@@ -163,6 +161,8 @@ package GLS3D
         private var textureStack:Vector.<Matrix3D> = new <Matrix3D>[ new Matrix3D() ]
         private var currentMatrixStack:Vector.<Matrix3D> = modelViewStack
         private var contextMaterial:Material = new Material(true)
+        private var cubeVertexData:Vector.<Number>;
+        private var cubeVertexBuffer:VertexBuffer3D = null;
 
         public static function init(context:Context3D, log:Object, stage:Stage):void
         {
@@ -979,14 +979,41 @@ package GLS3D
             CModule.write32(dataPtr, vertexBufferObjects.length - 1);
         }
 
-        //GLAPI.instance.glBufferData(%0, %1);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
-
         public function glBufferData(target:uint, size:uint, dataPtr:uint, usage:uint):void
         {
             if(target != GL_ARRAY_BUFFER)
                 throw "unimplemented"
+        }
 
-               
+        public function glDebugCube():void
+        {
+            if(!cubeVertexBuffer) {
+                cubeVertexBuffer = context.createVertexBuffer(36, 12);
+                cubeVertexBuffer.uploadFromVector(cubeVertexData, 0, 36);
+            }
+
+            var stream:VertexStream = new VertexStream()
+            stream.vertexBuffer = cubeVertexBuffer
+            stream.vertexFlags = VertexBufferBuilder.HAS_NORMAL
+            stream.polygonOffset = isGLState(ENABLE_POLYGON_OFFSET)
+            setupIndexBuffer(stream, GL_TRIANGLES, 36)
+
+            var cl:CommandList  = reusableCommandList
+            cl.executeOnCompile = true
+            cl.commands.length = 0
+            cl.activeState = null
+
+            if (cl.activeState)
+            {
+                cl.commands.push(cl.activeState)
+                cl.activeState = null
+            }
+
+            cl.commands.push(stream)
+            
+            if (log) log.send("========== DEBUG CUBE >>")
+            executeCommandList(cl)
+            if (log) log.send("========== DEBUG CUBE <<")
         }
 
         public function glEndVertexData(count:uint, mode:uint, data:ByteArray, dataPtr:uint, dataHash:uint, flags:uint):void
@@ -1673,6 +1700,42 @@ package GLS3D
 
             // id zero is null
             vertexBufferObjects.push(null);
+
+            const indices:Array = [
+                        0,1,2,
+                        3,2,1,
+                        4,0,6,
+                        6,0,2,
+                        5,1,4,
+                        4,1,0,
+                        7,3,1,
+                        7,1,5,
+                        5,4,7,
+                        7,4,6,
+                        7,2,3,
+                        7,6,2];
+
+            const vertices:Array = [    
+                        [1.0,1.0,1.0],
+                        [-1.0,1.0,1.0],
+                        [1.0,-1.0,1.0], 
+                        [-1.0,-1.0,1.0],    
+                        [1.0,1.0,-1.0],
+                        [-1.0,1.0,-1.0],    
+                        [1.0,-1.0,-1.0],    
+                        [-1.0,-1.0,-1.0]];
+
+            cubeVertexData = new Vector.<Number>();
+            var si:int=36;
+            for (var i:int=0;i<si;i+=3)
+            {
+                const v1:Array = vertices[indices[i]];
+                const v2:Array = vertices[indices[i+1]];
+                const v3:Array = vertices[indices[i+2]];
+                cubeVertexData.push(v1[0], v1[1], v1[2], 1, 1, 1, 1, 0, 0, 0, 0, 0);
+                cubeVertexData.push(v2[0], v2[1], v2[2], 1, 1, 1, 1, 0, 0, 0, 0, 0);
+                cubeVertexData.push(v3[0], v3[1], v3[2], 1, 1, 1, 1, 0, 0, 0, 0, 0);        
+            }
         }
 
         public function glClear(mask:uint):void
