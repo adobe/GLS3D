@@ -46,7 +46,7 @@ package GLS3D
 
     import com.adobe.utils.*;
     import com.adobe.utils.macro.*;
-    import flascc.CModule; 
+    import com.adobe.flascc.CModule; 
 
     // Linker trickery
     [Csym("D", "___libgl_abc__", ".data")]

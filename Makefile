@@ -1,16 +1,16 @@
-$?ALCHEMY:=/path/to/alchemy/SDK
+$?FLASCC:=/path/to/FLASCC/SDK
 
 all:
 	@mkdir -p install/usr/lib
 	@mkdir -p install/usr/include
 	
 	@echo "Compiling libGL.as"
-	@java -jar $(ALCHEMY)/usr/lib/asc.jar -md -strict -abcfuture -AS3 \
-	-import $(ALCHEMY)/usr/lib/builtin.abc \
-	-import $(ALCHEMY)/usr/lib/playerglobal.abc \
-	-import $(ALCHEMY)/usr/lib/BinaryData.abc \
-	-import $(ALCHEMY)/usr/lib/C_Run.abc \
-	-import $(ALCHEMY)/usr/lib/CModule.abc \
+	@java -jar $(FLASCC)/usr/lib/asc.jar -md -strict -abcfuture -AS3 \
+	-import $(FLASCC)/usr/lib/builtin.abc \
+	-import $(FLASCC)/usr/lib/playerglobal.abc \
+	-import $(FLASCC)/usr/lib/BinaryData.abc \
+	-import $(FLASCC)/usr/lib/C_Run.abc \
+	-import $(FLASCC)/usr/lib/CModule.abc \
 	-in src/com/adobe/utils/AGALMiniAssembler.as \
 	-in src/com/adobe/utils/AGALMacroAssembler.as \
 	-in src/com/adobe/utils/FractalGeometryGenerator.as \
@@ -28,7 +28,7 @@ all:
 	@mv libGL.abc install/usr/lib/
 	
 	@echo "Compiling libGL.cpp"
-	@$(ALCHEMY)/usr/bin/g++ -fno-exceptions -O4 -c -Iinstall/usr/include/ libGL.cpp
-	@$(ALCHEMY)/usr/bin/ar crus install/usr/lib/libGL.a install/usr/lib/libGL.abc libGL.o 
+	@$(FLASCC)/usr/bin/g++ -fno-exceptions -O4 -c -Iinstall/usr/include/ libGL.cpp
+	@$(FLASCC)/usr/bin/ar crus install/usr/lib/libGL.a install/usr/lib/libGL.abc libGL.o 
 
 	@rm -f libGL.o 

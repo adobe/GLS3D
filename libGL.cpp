@@ -235,7 +235,6 @@ extern void glClear (GLbitfield mask)
 }
 
 extern void glDebugCube() {
-  fprintf(stderr, "glDebugCube!!!\n");
   inline_as3("import GLS3D.GLAPI;\n"\
                "GLAPI.instance.glDebugCube();\n");
 }
