@@ -33,7 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <math.h>
 #include <GL/gl.h>
-#include <AS3.h>
+#include <AS3/AS3.h>
 #include <stdlib.h>
 
 extern "C" {
@@ -571,7 +571,7 @@ extern void glGenTextures (GLsizei n, GLuint *textures)
 
     inline_as3("import GLS3D.GLAPI;\n"\
                "var result:uint = GLAPI.instance.glGenTextures(%0);\n" :: "r"(n));
-    AS3_CopyAS3ToC(result, firstIndex);
+    AS3_GetScalarFromVar(firstIndex, result);
 
     for (i = 0; i < n; i++) {
         textures[i] = firstIndex + i;
@@ -929,7 +929,7 @@ extern GLuint glGenLists (GLsizei range)
 
     inline_as3("import GLS3D.GLAPI;\n"\
            "var result:uint = GLAPI.instance.glGenLists(%0);\n" : : "r"(range));
-    AS3_CopyAS3ToC(result, retVal);
+    AS3_GetScalarFromVar(retVal, result);
 
     return retVal;
 }
