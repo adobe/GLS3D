@@ -1,9 +1,9 @@
 OpenGL For Stage3D
 ==================
 
-This project provides an experimental implementation of the OpenGL API for use in the Flash Player. Behind the scenes all of the OpenGL APIs are implemented ontop of the Flash Player's GPU accelerated Stage3D rendering API. The implementation is intended to be used by existing C/C++ code compiled with Alchemy2 to target the Flash Player.
+This project provides an experimental implementation of the OpenGL API for use in the Flash Player. Behind the scenes all of the OpenGL APIs are implemented ontop of the Flash Player's GPU accelerated Stage3D rendering API. The implementation is intended to be used by existing C/C++ code compiled with flascc to target the Flash Player.
 
-- More information about Alchemy2: http://labs.adobe.com/technologies/alchemy/
+- More information about flascc: http://gaming.adobe.com/technologies/flascc
 - More information about Stage3D: http://gaming.adobe.com/
 
 Demos
