@@ -5,7 +5,7 @@ all:
 	@mkdir -p install/usr/include
 	
 	@echo "Compiling libGL.as"
-	@java -jar $(FLASCC)/usr/lib/asc.jar -md -strict -abcfuture -AS3 \
+	@java -jar $(FLASCC)/usr/lib/falcon-asc.jar -md -strict -optimize -AS3 \
 	-import $(FLASCC)/usr/lib/builtin.abc \
 	-import $(FLASCC)/usr/lib/playerglobal.abc \
 	-import $(FLASCC)/usr/lib/BinaryData.abc \
