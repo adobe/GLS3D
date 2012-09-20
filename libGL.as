@@ -985,6 +985,8 @@ package GLS3D
                 throw "unimplemented"
         }
 
+        var debugCubeStream:VertexStream
+
         public function glDebugCube():void
         {
             if(!cubeVertexBuffer) {
@@ -992,11 +994,13 @@ package GLS3D
                 cubeVertexBuffer.uploadFromVector(cubeVertexData, 0, 36);
             }
 
-            var stream:VertexStream = new VertexStream()
-            stream.vertexBuffer = cubeVertexBuffer
-            stream.vertexFlags = VertexBufferBuilder.HAS_NORMAL
-            stream.polygonOffset = isGLState(ENABLE_POLYGON_OFFSET)
-            setupIndexBuffer(stream, GL_TRIANGLES, 36)
+            if(!debugCubeStream) {
+                debugCubeStream = new VertexStream()
+                debugCubeStream.vertexBuffer = cubeVertexBuffer
+                debugCubeStream.vertexFlags = VertexBufferBuilder.HAS_NORMAL
+                debugCubeStream.polygonOffset = isGLState(ENABLE_POLYGON_OFFSET)
+                setupIndexBuffer(debugCubeStream, GL_TRIANGLES, 36)
+            }
 
             var cl:CommandList  = reusableCommandList
             cl.executeOnCompile = true
@@ -1009,11 +1013,11 @@ package GLS3D
                 cl.activeState = null
             }
 
-            cl.commands.push(stream)
+            cl.commands.push(debugCubeStream)
             
-            if (log) log.send("========== DEBUG CUBE >>")
+            //if (log) log.send("========== DEBUG CUBE >>")
             executeCommandList(cl)
-            if (log) log.send("========== DEBUG CUBE <<")
+            //if (log) log.send("========== DEBUG CUBE <<")
         }
 
         public function glEndVertexData(count:uint, mode:uint, data:ByteArray, dataPtr:uint, dataHash:uint, flags:uint):void
