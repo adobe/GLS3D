@@ -2132,6 +2132,10 @@ package GLS3D
         private function popCurrentLightingState():void
         {
             var lState:LightingState = lightingStates.pop()
+            if(lState == null) {
+              if (log) log.send("[WARNING] Calling popCurrentLightingState with lighting state")
+              return   
+            }
             this.contextColorMaterial = lState.enableColorMaterial
             this.contextEnableLighting = lState.enableLighting
             this.lightsEnabled = lState.lightsEnabled
