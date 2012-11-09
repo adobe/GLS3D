@@ -62,6 +62,6 @@ compile:
 	@rm -f libGL.o 
 
 install: check
-	@cp install/usr/include/ $(FLASCC)/usr/ -R
-	@cp install/usr/lib/ $(FLASCC)/usr/ -R
-	@cp $(FLASCC)/usr/include/SDL_opengl.h $(FLASCC)/usr/include/SDL/
+	@cp -r install/usr/include/ $(FLASCC)/usr/
+	@cp -r install/usr/lib/ $(FLASCC)/usr/
+	@cp $(FLASCC)/usr/SDL_opengl.h $(FLASCC)/usr/include/SDL/
