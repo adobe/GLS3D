@@ -820,7 +820,7 @@ extern void glGenBuffers (GLsizei n, GLuint *buffers)
 extern void glBufferData (GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage)
 {
     inline_as3("import GLS3D.GLAPI;\n"\
-               "GLAPI.instance.glBufferData(%0, %1);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
+               "GLAPI.instance.glBufferData(%0, %1, %2, %3);" :  : "r"(target), "r"(size), "r"(data), "r"(usage));
 }
 
 extern void glColorPointer (GLint size, GLenum type, GLsizei stride, const GLvoid *pointer)
