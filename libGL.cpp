@@ -253,6 +253,13 @@ extern void glClearDepth (GLclampd depth)
            : : "r"(depth) );
 }
 
+extern void glClearDepthf (GLclampf depth)
+{
+    inline_as3("import GLS3D.GLAPI;\n"\
+               "GLAPI.instance.glClearDepth(%0);\n"
+           : : "r"(depth) );
+}
+
 extern void glClearStencil (GLint s)
 {
     inline_as3("import GLS3D.GLAPI;\n"\
