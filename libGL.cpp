@@ -190,6 +190,19 @@ private:
 static VertexBufferBuilder vbb;
 
 
+// OpenGL state
+//**NOTE**: Incomplete, should add as we go
+#define COLOR_WRITE_MASK_R    	0
+#define COLOR_WRITE_MASK_G		1
+#define COLOR_WRITE_MASK_B		2
+#define COLOR_WRITE_MASK_A		3
+struct GLState
+{
+	GLboolean	depthWriteMask;
+	GLboolean	colorWriteMask[4];	// RGBA
+};
+static GLState glState;
+
 
 extern void glVertex2i (GLint x, GLint y)
 {
@@ -889,6 +902,9 @@ extern void glMultMatrixf (const GLfloat *m)
 
 extern void glDepthMask (GLboolean flag)
 {
+    // Cache glState
+	glState.depthWriteMask = flag;
+    
     inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glDepthMask(%0);\n" : : "r"(flag));
 }
@@ -1200,6 +1216,12 @@ extern void glFrontFace (GLenum mode)
 
 extern void glColorMask (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
 {
+    // Cache glState
+	glState.colorWriteMask[COLOR_WRITE_MASK_R] = red;
+	glState.colorWriteMask[COLOR_WRITE_MASK_G] = green;
+	glState.colorWriteMask[COLOR_WRITE_MASK_B] = blue;
+	glState.colorWriteMask[COLOR_WRITE_MASK_A] = alpha;
+    
     inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColorMask(%0, %1, %2, %3);\n" : : "r"(red), "r"(green), "r"(blue), "r"(alpha));
 }
@@ -1841,9 +1863,25 @@ extern void glFogiv (GLenum pname, const GLint *params)
 
 extern void glGetBooleanv (GLenum pname, GLboolean *params)
 {
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glGetBooleanv...\n");
-    }
+    switch (pname)
+	{
+	case GL_DEPTH_WRITEMASK:
+		params[0] = glState.depthWriteMask;
+		break;
+
+	case GL_COLOR_WRITEMASK:
+		params[0] = glState.colorWriteMask[COLOR_WRITE_MASK_R];
+		params[1] = glState.colorWriteMask[COLOR_WRITE_MASK_G];
+		params[2] = glState.colorWriteMask[COLOR_WRITE_MASK_B];
+		params[3] = glState.colorWriteMask[COLOR_WRITE_MASK_A];
+		break;
+
+	default:
+		// Not implemented
+		if(stubMsg) {
+			fprintf(stderr, "stubbed glGetBooleanv...\n");
+		}
+	}
 }
 
 extern void glGetClipPlane (GLenum plane, GLdouble *equation)
