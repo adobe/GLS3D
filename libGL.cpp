@@ -670,7 +670,9 @@ extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoi
         for(int e=0; e<count; e++) {
             int i;
             if(type == GL_UNSIGNED_INT) {
-                i = ((GLuint*)indices)[e];
+                i = ((GLuint*)indices)[e];                
+    		} else if (type == GL_UNSIGNED_SHORT) {
+				i = ((GLushort*)indices)[e];
             } else if(verboseDebug) {
                 inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte indicies');\n");
             }
