@@ -500,6 +500,12 @@ extern void glOrtho (GLdouble left, GLdouble right, GLdouble bottom, GLdouble to
            "GLAPI.instance.glOrtho(%0, %1, %2, %3, %4, %5)\n" : : "r"(left),"r"(right),"r"(bottom),"r"(top),"r"(zNear),"r"(zFar));
 }
 
+extern void glOrthof (GLfloat left, GLfloat right, GLfloat bottom, GLfloat top, GLfloat zNear, GLfloat zFar)
+{
+    inline_as3("import GLS3D.GLAPI;\n"\
+           "GLAPI.instance.glOrtho(%0, %1, %2, %3, %4, %5)\n" : : "r"(left),"r"(right),"r"(bottom),"r"(top),"r"(zNear),"r"(zFar));
+}
+
 extern void glLoadIdentity (void)
 {
     inline_as3("import GLS3D.GLAPI;\n"\
