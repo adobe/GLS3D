@@ -36,13 +36,45 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <AS3/AS3.h>
 #include <stdlib.h>
 
+
+
+//=======================================================================
+//		CPP HELPER FUNCTIONS
+//=======================================================================
+
+template <typename T>
+void glDrawElements_Triangles(GLsizei count, const GLvoid* indicesPtr);
+
+template <typename T>
+void glDrawElements_TriStrips(GLsizei count, const GLvoid* indicesPtr);
+
+
+
 extern "C" {
 
 // Force libGL.abc to get linked in
 extern int __libgl_abc__;
 void __libgl_abc__linker_hack() { __libgl_abc__ = 0; }
 
-#define null 0
+
+//=======================================================================
+//		CONSTANTS & MACROS
+//=======================================================================
+
+#define null									0
+
+#define GLS3D_COLOR_WRITE_MASK_R				0
+#define GLS3D_COLOR_WRITE_MASK_G				1
+#define GLS3D_COLOR_WRITE_MASK_B				2
+#define GLS3D_COLOR_WRITE_MASK_A				3
+
+#define GL_DRAW_ELEMENTS_DO_PARAM_CHECK			1			// 1=Input validation (Should be on for debug lib)
+
+
+
+//=======================================================================
+//		HELPER CLASSES/STRUCTS
+//=======================================================================
 
 class VertexBufferBuilder
 {
@@ -192,10 +224,6 @@ static VertexBufferBuilder vbb;
 
 // OpenGL state
 //**NOTE**: Incomplete, should add as we go
-#define COLOR_WRITE_MASK_R    	0
-#define COLOR_WRITE_MASK_G		1
-#define COLOR_WRITE_MASK_B		2
-#define COLOR_WRITE_MASK_A		3
 struct GLState
 {
 	GLboolean	depthWriteMask;
@@ -683,77 +711,78 @@ static int verboseDebug = 0;
 
 extern void glDrawElements (GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
+	// Type check
+	void (*fpDrawTriangles)(GLsizei count, const GLvoid* indices) = NULL; 
+	void (*fpDrawTriStrips)(GLsizei count, const GLvoid* indices) = NULL;
+
+	switch (type) 
+	{
+	case GL_UNSIGNED_INT:
+		fpDrawTriangles	= &(glDrawElements_Triangles<GLuint>);
+		fpDrawTriStrips	= &(glDrawElements_TriStrips<GLuint>);
+		break;
+	case GL_UNSIGNED_SHORT:
+		fpDrawTriangles	= &(glDrawElements_Triangles<GLushort>);
+		fpDrawTriStrips	= &(glDrawElements_TriStrips<GLushort>);
+		break;
+	default:
+		if(verboseDebug) {				
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte/ushort indicies');\n");
+		}			
+	}
+
+#if (GL_DRAW_ELEMENTS_DO_PARAM_CHECK)
+	// glColor state check 
+	if (AState.colors.enabled) {
+		// Supported type
+		bool glColorSupported  = (AState.colors.type == GL_UNSIGNED_BYTE);	// **NOTE: Can be expanded as we expand more types
+			 glColorSupported &= (AState.colors.size == 4);					// Only RGBA colors are supported
+
+		if (!glColorSupported) {
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colors');\n");
+		}
+	}
+
+	// glTexCoord state check
+	const StateInfo& tex0 = AState.texcoords[activeTextureUnit - GL_TEXTURE0];
+	if (tex0.enabled) {
+		// Supported type
+		bool glTexCoordSupported  = (tex0.type == GL_FLOAT);	// **NOTE: Can be expanded as we support more types
+			 glTexCoordSupported &= (tex0.size == 2);			// Only support 2-component texcoord
+
+		if(verboseDebug) {
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
+		}
+	}
+
+	// glVertex state check
+	if(AState.verts.enabled) {
+		// Supported type
+		bool glVertexSupported	= (AState.verts.type == GL_FLOAT);	//**NOTE: Can be expanded as we support more types
+			 glVertexSupported &= (AState.verts.size == 2 || AState.verts.size == 3);
+
+		if(verboseDebug) {
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
+		}
+	}
+#endif	// GL_DRAW_ELEMENTS_DO_PARAM_CHECK
+
+
     glBegin(mode);
 
-    switch(mode) {
-    case GL_TRIANGLES:
-        for(int e=0; e<count; e++) {
-            int i;
-            if(type == GL_UNSIGNED_INT) {
-                i = ((GLuint*)indices)[e];                
-    		} else if (type == GL_UNSIGNED_SHORT) {
-				i = ((GLushort*)indices)[e];
-            } else if(verboseDebug) {
-                inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte indicies');\n");
-            }
-
-            if(AState.colors.enabled) {
-                GLubyte *cptr;
-                if(AState.colors.type == GL_UNSIGNED_BYTE && AState.colors.size == 4) {
-                    cptr = getUBytePtr(AState.colors.ptr, max(AState.colors.stride, AState.colors.size), i);
-                } else {
-                    if(verboseDebug) {
-                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colorss');\n");
-                    }
-                }
-
-                glColor4ub(cptr[0], cptr[1], cptr[2], cptr[3]);
-            }
-
-            if(AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled) {
-                GLfloat *tptr;
-                if(AState.texcoords[activeTextureUnit - GL_TEXTURE0].type == GL_FLOAT && AState.texcoords[activeTextureUnit - GL_TEXTURE0].size == 2) {
-                    tptr = getFloatPtr(AState.texcoords[activeTextureUnit - GL_TEXTURE0].ptr, max(AState.texcoords[activeTextureUnit - GL_TEXTURE0].stride, AState.texcoords[activeTextureUnit - GL_TEXTURE0].size*sizeof(GLfloat)), i);
-                } else {
-                    if(verboseDebug) {
-                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
-                    }
-                }
-
-                glTexCoord2f(tptr[0], tptr[1]);
-            }
-
-            if(AState.verts.enabled) {
-                GLfloat *vptr;
-                if(AState.verts.type == GL_FLOAT) {
-                    vptr = getFloatPtr(AState.verts.ptr, max(AState.verts.stride, AState.verts.size*sizeof(GLfloat)), i);
-                } else {
-                    if(verboseDebug) {
-                        inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
-                    }
-                }
-                switch(AState.verts.size) {
-                case 2:
-                    glVertex2f(vptr[0], vptr[1]);
-                    break;
-                case 3:
-                    glVertex3f(vptr[0], vptr[1], vptr[2]);
-                    break;
-                default:
-                    if(verboseDebug) {
-inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
-                    }
-                    break;
-                }
-            }
-        }
-        break;
+    switch(mode) 
+	{
+    case GL_TRIANGLES: 
+		fpDrawTriangles(count, indices);
+		break;
+	case GL_TRIANGLE_STRIP:
+		fpDrawTriStrips(count, indices);
+		break;
     default:
         if(verboseDebug) {
-            inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant handle anything but triangles');\n");
-        }
-        if(verboseDebug) {
-inline_as3("import GLS3D.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(mode), "r"(count), "r"(type), "r"(indices));
+            inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements cant only handle triangles/triangle strips');\n");
+			inline_as3("import GLS3D.GLAPI;\n GLAPI.instance.send('stubbed glDrawElements '  +%0 + ',' + %1 + ',' + %2 + ',' + %3);\n" : : "r"(mode), "r"(count), "r"(type), "r"(indices));
         }
         break;
     }
@@ -904,9 +933,9 @@ extern void glMultMatrixf (const GLfloat *m)
 
 extern void glDepthMask (GLboolean flag)
 {
-    // Cache glState
+	// Cache glState
 	glState.depthWriteMask = flag;
-    
+
     inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glDepthMask(%0);\n" : : "r"(flag));
 }
@@ -1218,12 +1247,12 @@ extern void glFrontFace (GLenum mode)
 
 extern void glColorMask (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
 {
-    // Cache glState
-	glState.colorWriteMask[COLOR_WRITE_MASK_R] = red;
-	glState.colorWriteMask[COLOR_WRITE_MASK_G] = green;
-	glState.colorWriteMask[COLOR_WRITE_MASK_B] = blue;
-	glState.colorWriteMask[COLOR_WRITE_MASK_A] = alpha;
-    
+	// Cache glState
+	glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_R] = red;
+	glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_G] = green;
+	glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_B] = blue;
+	glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_A] = alpha;
+
     inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.glColorMask(%0, %1, %2, %3);\n" : : "r"(red), "r"(green), "r"(blue), "r"(alpha));
 }
@@ -1865,17 +1894,17 @@ extern void glFogiv (GLenum pname, const GLint *params)
 
 extern void glGetBooleanv (GLenum pname, GLboolean *params)
 {
-    switch (pname)
+	switch (pname)
 	{
 	case GL_DEPTH_WRITEMASK:
 		params[0] = glState.depthWriteMask;
 		break;
 
 	case GL_COLOR_WRITEMASK:
-		params[0] = glState.colorWriteMask[COLOR_WRITE_MASK_R];
-		params[1] = glState.colorWriteMask[COLOR_WRITE_MASK_G];
-		params[2] = glState.colorWriteMask[COLOR_WRITE_MASK_B];
-		params[3] = glState.colorWriteMask[COLOR_WRITE_MASK_A];
+		params[0] = glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_R];
+		params[1] = glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_G];
+		params[2] = glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_B];
+		params[3] = glState.colorWriteMask[GLS3D_COLOR_WRITE_MASK_A];
 		break;
 
 	default:
@@ -1884,6 +1913,7 @@ extern void glGetBooleanv (GLenum pname, GLboolean *params)
 			fprintf(stderr, "stubbed glGetBooleanv...\n");
 		}
 	}
+
 }
 
 extern void glGetClipPlane (GLenum plane, GLdouble *equation)
@@ -4665,4 +4695,143 @@ extern void glUniformMatrix4x3fv (GLint location, GLsizei count, GLboolean trans
     }
 }
 
+}
+
+
+
+//**************************************************************************************
+// Name: glDrawElements_XXX
+// Note: can further be optimized by using policy based design
+//**************************************************************************************
+
+// Helper struct
+struct DrawContext
+{
+	const StateInfo*	pColor;
+	const StateInfo*	pTex0;
+	const StateInfo*	pVerts;
+	int			colorStride;
+	int			tex0Stride;
+	int			vertsStride;
+	
+	void	SetDrawContext	(const ArrayEXTState& states)
+	{
+		pColor	= &states.colors;
+		pTex0	= &states.texcoords[activeTextureUnit - GL_TEXTURE0];
+		pVerts	= &states.verts;
+	
+		colorStride = max(pColor->stride, pColor->size);
+		tex0Stride	= max(pTex0->stride,  pTex0->size*sizeof(GLfloat));
+		vertsStride	= max(pVerts->stride, pVerts->size*sizeof(GLfloat));
+	}
+	void	glSetVertex(int idx)
+	{
+		// Color
+		if (pColor->enabled) {
+			GLubyte *cptr = getUBytePtr(pColor->ptr, colorStride, idx);
+			glColor4ub(cptr[0], cptr[1], cptr[2], cptr[3]);
+		}
+
+		// Texcoord
+		if (pTex0->enabled) {
+			GLfloat *tptr = getFloatPtr(pTex0->ptr, tex0Stride, idx);
+			glTexCoord2f(tptr[0], tptr[1]);
+		}
+
+		// Verts
+		if (pVerts->enabled) {
+			GLfloat *vptr = getFloatPtr(pVerts->ptr, vertsStride, idx);
+			switch (pVerts->size) {
+			case 2:
+				glVertex2f(vptr[0], vptr[1]);
+				break;
+			case 3:
+				glVertex3f(vptr[0], vptr[1], vptr[2]);
+				break;
+			default:
+				if(verboseDebug) {
+					inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
+				}
+				break;
+			}
+		}
+	}
+};
+static DrawContext glDrawContext;
+
+// GL_TRIANGLES
+template <typename T>
+void glDrawElements_Triangles(GLsizei count, const GLvoid* indicesPtr)
+{
+	glDrawContext.SetDrawContext(AState);
+
+	T*	indices = (T*)indicesPtr;
+	for(int e=0; e<count; e++) 
+	{
+		T idx = indices[e];
+		glDrawContext.glSetVertex(idx);
+	}
+}
+
+
+// GL_TRIANGLE_STRIP
+template <typename T>
+void glDrawElements_TriStrips(GLsizei count, const GLvoid* indicesPtr)
+{
+#if (GL_DRAW_ELEMENTS_DO_PARAM_CHECK)
+	if (count < 3)
+	{
+		if(verboseDebug) {
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('GL_TRIANGLE_STRIP requires at least 3 verts');\n");
+		}
+		return;
+	}
+#endif
+
+	glDrawContext.SetDrawContext(AState);
+
+	T*	indices			= (T*)indicesPtr;
+	int numTriangles	= count-2;
+
+	T	cachedIdx[2];
+	cachedIdx[0] = *indices++;
+	cachedIdx[1] = *indices++;
+
+	int numLoop = numTriangles / 2;
+	while (numLoop-- > 0)
+	{
+		// Grab 4 indices
+		T idx0 = cachedIdx[0];
+		T idx1 = cachedIdx[1];
+		T idx2 = *indices++;
+		T idx3 = *indices++;
+
+		// First triangle - 0,1,2
+		glDrawContext.glSetVertex(idx0);
+		glDrawContext.glSetVertex(idx1);
+		glDrawContext.glSetVertex(idx2);
+
+		// Second triangle - 1,3,2
+		//**NOTE**: We don't need to reverse the order because generateDLIndexData() in libGL.as
+		//          will do it for us. (This can be optimized??)
+		glDrawContext.glSetVertex(idx1);
+		glDrawContext.glSetVertex(idx2);
+		glDrawContext.glSetVertex(idx3);
+		
+		// Update cached verts
+		cachedIdx[0] = idx2;
+		cachedIdx[1] = idx3;
+	}
+
+	// Finish off the final vert if any
+	if ((numTriangles & 1) != 0)
+	{
+		T idx0 = cachedIdx[0];
+		T idx1 = cachedIdx[1];
+		T idx2 = *indices++;
+
+		glDrawContext.glSetVertex(idx0);
+		glDrawContext.glSetVertex(idx1);
+		glDrawContext.glSetVertex(idx2);
+	}
 }
