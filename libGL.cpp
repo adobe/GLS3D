@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 #include <GL/gl.h>
 #include <AS3/AS3.h>
@@ -660,6 +661,10 @@ int activeTextureUnit = GL_TEXTURE0;
 
 struct ArrayEXTState {
     StateInfo verts, colors, texcoords[GL_MAX_TEXTURE_COORDS];
+    StateInfo verts;
+	StateInfo colors;
+	StateInfo normals;
+	StateInfo texcoords[GL_MAX_TEXTURE_COORDS];
 } AState;
 
 
@@ -681,6 +686,9 @@ extern void glEnableClientState (GLenum array)
     case GL_TEXTURE_COORD_ARRAY:
         AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled = GL_TRUE;
         break;
+	case GL_NORMAL_ARRAY:
+		AState.normals.enabled = GL_TRUE;
+		break;
     default:
         inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('stubbed glEnableClientState '  +%0);\n" : : "r"(array));
@@ -700,6 +708,9 @@ extern void glDisableClientState (GLenum array)
     case GL_TEXTURE_COORD_ARRAY:
         AState.texcoords[activeTextureUnit - GL_TEXTURE0].enabled = GL_FALSE;
         break;
+	case GL_NORMAL_ARRAY:
+		AState.normals.enabled = GL_FALSE;
+		break;
     default:
         inline_as3("import GLS3D.GLAPI;\n"\
            "GLAPI.instance.send('stubbed glDisableClientState '  +%0);\n" : : "r"(array));
@@ -1164,9 +1175,11 @@ extern void glLightfv (GLenum light, GLenum pname, const GLfloat *params)
 {
     float fr, fg, fb, fa;
 
-    if (pname == GL_SPOT_EXPONENT || pname == GL_SPOT_CUTOFF ||
-            pname == GL_CONSTANT_ATTENUATION || pname == GL_LINEAR_ATTENUATION ||
-            pname == GL_QUADRATIC_ATTENUATION) {
+    if (pname == GL_SPOT_EXPONENT || 
+		pname == GL_SPOT_CUTOFF ||
+        pname == GL_CONSTANT_ATTENUATION || 
+		pname == GL_LINEAR_ATTENUATION ||
+        pname == GL_QUADRATIC_ATTENUATION) {
         fr = (float)params[0];
         fg = 0.0f;
         fb = 0.0f;
@@ -2191,8 +2204,14 @@ extern void glLightModeliv (GLenum pname, const GLint *params)
 
 extern void glLightf (GLenum light, GLenum pname, GLfloat param)
 {
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glLightf...\n");
+    if (pname == GL_SPOT_EXPONENT || 
+		pname == GL_SPOT_CUTOFF ||
+        pname == GL_CONSTANT_ATTENUATION || 
+		pname == GL_LINEAR_ATTENUATION ||
+        pname == GL_QUADRATIC_ATTENUATION) {
+		glLightfv(light, pname, &param);
+    } else if(verboseDebug) {
+		inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glLightf only accepts GL_SPOT_EXPONENT, GL_SPOT_CUTOFF, GL_CONSTANT_ATTENUATION, GL_LINEAR_ATTENUATION, GL_QUADRATIC_ATTENUATION');\n");
     }
 }
 
@@ -2310,8 +2329,10 @@ extern void glMapGrid2f (GLint un, GLfloat u1, GLfloat u2, GLint vn, GLfloat v1,
 
 extern void glMaterialf (GLenum face, GLenum pname, GLfloat param)
 {
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glMaterialf...\n");
+    if (pname == GL_SHININESS) {
+		glMaterialfv(face, pname, &param);
+    } else if(verboseDebug) {
+		inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glMaterialf only accepts GL_SPOT_EXPONENT, GL_SPOT_CUTOFF, GL_CONSTANT_ATTENUATION, GL_LINEAR_ATTENUATION, GL_QUADRATIC_ATTENUATION');\n");
     }
 }
 
@@ -2380,9 +2401,10 @@ extern void glNormal3sv (const GLshort *v)
 
 extern void glNormalPointer (GLenum type, GLsizei stride, const GLvoid *pointer)
 {
-    if(stubMsg) {
-        fprintf(stderr, "stubbed glNormalPointer...\n");
-    }
+	AState.normals.size		= 3;
+	AState.normals.type		= type;
+	AState.normals.stride	= stride;
+	AState.normals.ptr		= pointer;
 }
 
 extern void glPassThrough (GLfloat token)
@@ -4603,19 +4625,23 @@ struct DrawContext
 {
 	const StateInfo*	pColor;
 	const StateInfo*	pTex0;
+	const StateInfo*	pNormal;
 	const StateInfo*	pVerts;
 	int			colorStride;
 	int			tex0Stride;
+	int			normalStride;
 	int			vertsStride;
 	
 	void	SetDrawContext	(const ArrayEXTState& states)
 	{
 		pColor	= &states.colors;
 		pTex0	= &states.texcoords[activeTextureUnit - GL_TEXTURE0];
+		pNormal	= &states.normals;
 		pVerts	= &states.verts;
 	
 		colorStride = max(pColor->stride, pColor->size);
 		tex0Stride	= max(pTex0->stride,  pTex0->size*sizeof(GLfloat));
+		normalStride= max(pNormal->stride, pNormal->size*sizeof(GLfloat));
 		vertsStride	= max(pVerts->stride, pVerts->size*sizeof(GLfloat));
 	}
 	void	glSetVertex(int idx)
@@ -4630,6 +4656,12 @@ struct DrawContext
 		if (pTex0->enabled) {
 			GLfloat *tptr = getFloatPtr(pTex0->ptr, tex0Stride, idx);
 			glTexCoord2f(tptr[0], tptr[1]);
+		}
+
+		// Normal
+		if (pNormal->enabled) {
+			GLfloat *nptr = getFloatPtr(pNormal->ptr, normalStride, idx);
+			glNormal3f(nptr[0], nptr[1], nptr[2]);
 		}
 
 		// Verts
@@ -4664,7 +4696,7 @@ void _glDrawPrimitives(GLint first, GLsizei count, const GLvoid *indices, GLenum
 		bool glColorSupported  = (AState.colors.type == GL_UNSIGNED_BYTE);	// **NOTE: Can be expanded as we expand more types
 			 glColorSupported &= (AState.colors.size == 4);					// Only RGBA colors are supported
 
-		if (!glColorSupported) {
+		if (!glColorSupported && verboseDebug) {
 			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have ubyte colors');\n");
 		}
 	}
@@ -4673,21 +4705,32 @@ void _glDrawPrimitives(GLint first, GLsizei count, const GLvoid *indices, GLenum
 	const StateInfo& tex0 = AState.texcoords[activeTextureUnit - GL_TEXTURE0];
 	if (tex0.enabled) {
 		// Supported type
-		bool glTexCoordSupported  = (tex0.type == GL_FLOAT);	// **NOTE: Can be expanded as we support more types
-			 glTexCoordSupported &= (tex0.size == 2);			// Only support 2-component texcoord
+		bool glTexCoordSupported  = (tex0.type == GL_FLOAT);				// **NOTE: Can be expanded as we support more types
+			 glTexCoordSupported &= (tex0.size == 2);						// Only support 2-component texcoord
 
-		if(verboseDebug) {
+		if (!glTexCoordSupported && verboseDebug) {
 			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float texcoords');\n");
 		}
 	}
 
-	// glVertex state check
-	if(AState.verts.enabled) {
+	// glNormal state check
+	if (AState.normals.enabled) {
 		// Supported type
-		bool glVertexSupported	= (AState.verts.type == GL_FLOAT);	//**NOTE: Can be expanded as we support more types
+		bool glNormalSupported	= (AState.normals.type == GL_FLOAT);		//**NOTE: Can be expanded as we support more types
+			 glNormalSupported &= (AState.normals.size == 3);
+
+		if (!glNormalSupported && verboseDebug) {
+			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float normals');\n");
+		}
+	}
+
+	// glVertex state check
+	if (AState.verts.enabled) {
+		// Supported type
+		bool glVertexSupported	= (AState.verts.type == GL_FLOAT);			//**NOTE: Can be expanded as we support more types
 			 glVertexSupported &= (AState.verts.size == 2 || AState.verts.size == 3);
 
-		if(verboseDebug) {
+		if (!glVertexSupported && verboseDebug) {
 			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements must have float verts');\n");
 			inline_as3("import GLS3D.GLAPI; GLAPI.instance.send('FAIL glDrawElements unknown vert num' + %0);\n" :  : "r"(AState.verts.size));
 		}
