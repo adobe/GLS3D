@@ -71,8 +71,34 @@ public static const GL_STREAM_DRAW:uint   = 0x88E0
 public static const GL_STATIC_DRAW:uint   = 0x88E4
 public static const GL_DYNAMIC_DRAW:uint  = 0x88E8
 
-public static const GL_FRAGMENT_SHADER:uint  = 0x8B30
-public static const GL_VERTEX_SHADER:uint    = 0x8B31
+/* Shaders */
+public static const GL_FRAGMENT_SHADER:uint  					= 0x8B30
+public static const GL_VERTEX_SHADER:uint						= 0x8B31
+public static const GL_MAX_VERTEX_ATTRIBS:uint					= 0x8869
+public static const GL_MAX_VERTEX_UNIFORM_VECTORS:uint			= 0x8DFB
+public static const GL_MAX_VARYING_VECTORS:uint					= 0x8DFC
+public static const GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS:uint    = 0x8B4D
+public static const GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS:uint		= 0x8B4C
+public static const GL_MAX_TEXTURE_IMAGE_UNITS:uint				= 0x8872
+public static const GL_MAX_FRAGMENT_UNIFORM_VECTORS:uint		= 0x8DFD
+public static const GL_SHADER_TYPE:uint							= 0x8B4F
+public static const GL_DELETE_STATUS:uint						= 0x8B80
+public static const GL_LINK_STATUS:uint							= 0x8B82
+public static const GL_VALIDATE_STATUS:uint						= 0x8B83
+public static const GL_ATTACHED_SHADERS:uint					= 0x8B85
+public static const GL_ACTIVE_UNIFORMS:uint						= 0x8B86
+public static const GL_ACTIVE_UNIFORM_MAX_LENGTH:uint			= 0x8B87
+public static const GL_ACTIVE_ATTRIBUTES:uint					= 0x8B89
+public static const GL_ACTIVE_ATTRIBUTE_MAX_LENGTH:uint			= 0x8B8A
+public static const GL_SHADING_LANGUAGE_VERSION:uint			= 0x8B8C
+public static const GL_CURRENT_PROGRAM:uint						= 0x8B8D
+
+/* Shader Source */
+public static const GL_COMPILE_STATUS:uint						= 0x8B81
+public static const GL_INFO_LOG_LENGTH:uint						= 0x8B84
+public static const GL_SHADER_SOURCE_LENGTH:uint				= 0x8B88
+public static const GL_SHADER_COMPILER:uint						= 0x8DFA
+
 
 public static const CDATA_FLOAT1:uint        = 1
 public static const CDATA_FLOAT2:uint        = 2
@@ -329,6 +355,7 @@ private static const PIXEL_FORMAT:Array = [
 "GL_RGBA",
 ]
 
+
 /* PixelType */
 public static const GL_BITMAP:uint =                         0x1A00
 public static const GL_BYTE:uint =                           0x1400
@@ -376,4 +403,41 @@ private static const PIXEL_TYPE:Array = [
 "GL_UNSIGNED_SHORT_1_5_5_5_REV",
 "GL_UNSIGNED_INT_8_8_8_8_REV",
 "GL_UNSIGNED_INT_2_10_10_10_REV",
+]
+
+/* Uniform Types */
+public static const GL_FLOAT_VEC2:uint =                     0x8B50
+public static const GL_FLOAT_VEC3:uint =                     0x8B51
+public static const GL_FLOAT_VEC4:uint =                     0x8B52
+public static const GL_INT_VEC2:uint =                       0x8B53
+public static const GL_INT_VEC3:uint =                       0x8B54
+public static const GL_INT_VEC4:uint =                       0x8B55
+public static const GL_BOOL:uint =                           0x8B56
+public static const GL_BOOL_VEC2:uint =                      0x8B57
+public static const GL_BOOL_VEC3:uint =                      0x8B58
+public static const GL_BOOL_VEC4:uint =                      0x8B59
+public static const GL_FLOAT_MAT2:uint =                     0x8B5A
+public static const GL_FLOAT_MAT3:uint =                     0x8B5B
+public static const GL_FLOAT_MAT4:uint =                     0x8B5C
+public static const GL_SAMPLER_2D:uint =                     0x8B5E
+public static const GL_SAMPLER_CUBE:uint =                   0x8B60
+
+public static const UNIFORM_TYPES:Array = [
+	"GL_FLOAT_VEC2",
+	"GL_FLOAT_VEC3",
+	"GL_FLOAT_VEC4",
+	"GL_INT_VEC2",
+	"GL_INT_VEC3",
+	"GL_INT_VEC4",
+	"GL_BOOL",
+	"GL_BOOL_VEC2",
+	"GL_BOOL_VEC3",
+	"GL_BOOL_VEC4",
+	"GL_FLOAT_MAT2",
+	"GL_FLOAT_MAT3",
+	"GL_FLOAT_MAT4",
+	"Unknown",
+	"GL_SAMPLER_2D",
+	"Unknown",
+	"GL_SAMPLER_CUBE",
 ]
