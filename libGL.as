@@ -378,12 +378,29 @@ package GLS3D
                     break
                 case GL_POSITION:
                     // transform position to eye-space before storing.
-                    var m:Matrix3D = modelViewStack[modelViewStack.length - 1].clone()
-                    var result:Vector3D = m.transformVector(new Vector3D(r, g, b, a))
-                    l.position[0] = result.x
-                    l.position[1] = result.y
-                    l.position[2] = result.z
-                    l.position[3] = result.w
+                    var m:Matrix3D = modelViewStack[modelViewStack.length - 1].clone();
+    				var result:Vector3D;
+					if (a == 0.0)
+					{	// Directional light
+						m.position = new Vector3D(0, 0, 0, 1);
+						result = m.transformVector(new Vector3D(r, g, b, a));
+						l.position[0] = result.x;
+						l.position[1] = result.y;
+						l.position[2] = result.z;
+						l.position[3] = 0;
+
+						l.type = Light.LIGHT_TYPE_DIRECTIONAL;
+					}
+					else
+					{	// Point light
+						result = m.transformVector(new Vector3D(r, g, b, a));
+						l.position[0] = result.x;
+						l.position[1] = result.y;
+						l.position[2] = result.z;
+						l.position[3] = result.w;
+
+						l.type = Light.LIGHT_TYPE_POINT;
+					}
                     break
                 default:
                     break
@@ -1518,6 +1535,16 @@ package GLS3D
                         var ldif:String = "vc" + (starti+2).toString()
                         var lspe:String = "vc" + (starti+3).toString()
                         
+    					var lightVectorAgalInstr:String;
+						if (l.type == Light.LIGHT_TYPE_DIRECTIONAL)
+						{
+							lightVectorAgalInstr = "mov vt4, " + lpos;
+						}
+						else	// Assume point light
+						{
+							lightVectorAgalInstr = "sub vt4, " + lpos + ", vt0";
+						}
+
                         var lightpiece:String = [
                             //   ambient color
                             "mov vt4, " + lamb,
@@ -1525,7 +1552,7 @@ package GLS3D
                             "add vt3, vt3, vt4",               // add ambient color from light0
                             
                             //   diffuse color
-                            "sub vt4, " + lpos + ", vt0",      // vt4 = L = light0 pos - vertex pos
+                            lightVectorAgalInstr,    		   // vt4 = L = light0 pos - vertex pos
                             "nrm vt4.xyz, vt4",                // vt4 = norm(L)
                             "mov vt5, vt1",
                             "dp3 vt5.x, vt4, vt5",             // vt5.x = L · n
