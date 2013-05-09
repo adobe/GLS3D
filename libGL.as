@@ -2857,6 +2857,10 @@ class CommandList
 
 class Light
 {
+    public static const LIGHT_TYPE_POINT:uint		= 0;
+    public static const LIGHT_TYPE_DIRECTIONAL:uint	= 1;
+    public static const LIGHT_TYPE_SPOT:uint		= 2;		// Not supported
+
     public var position:Vector.<Number>
     public var ambient:Vector.<Number>
     public var diffuse:Vector.<Number>
