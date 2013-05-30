@@ -4254,6 +4254,13 @@ extern void glGetVertexAttribPointerv (GLuint index, GLenum pname, GLvoid* *poin
     }
 }
 
+extern GLuint glCreateShader (GLenum)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glCreateShader...\n");
+    }
+}
+    
 extern void glDeleteShader (GLuint shader)
 {
     if(stubMsg) {
@@ -4513,13 +4520,27 @@ extern void glGetUniformiv (GLuint program, GLint location, GLint *params)
     }
 }
 
+extern int glGetUniformLocation (GLuint, const GLchar*)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glGetUniformLocation...\n");
+    }
+}
+
 extern void glGetShaderSource (GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *source)
 {
     if(stubMsg) {
         fprintf(stderr, "stubbed glGetShaderSource...\n");
     }
 }
-
+    
+extern int glGetAttribLocation (GLuint program, const GLchar* name)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glGetAttribLocation...\n");
+    }
+}
+    
 extern void glBindAttribLocation (GLuint program, GLuint index, const GLchar *name)
 {
     if(stubMsg) {
@@ -4597,9 +4618,49 @@ extern void glUniformMatrix4x3fv (GLint location, GLsizei count, GLboolean trans
     }
 }
 
+extern void glGenFramebuffers (GLsizei, GLuint*)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glGenFramebuffers...\n");
+    }
 }
 
+extern void glGetRenderbufferParameteriv (GLenum target, GLenum pname, GLint* params)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glGetRenderbufferParameteriv...\n");
+    }
+}
 
+extern void glBindFramebuffer (GLenum target, GLuint framebuffer)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glBindFramebuffer...\n");
+    }
+}
+
+extern GLenum glCheckFramebufferStatus (GLenum target)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glCheckFramebufferStatus...\n");
+    }
+}
+
+extern void glDeleteFramebuffers (GLsizei n, const GLuint* framebuffers)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glDeleteFramebuffers...\n");
+    }
+}
+
+extern void glFramebufferTexture2D (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)
+{
+    if(stubMsg) {
+        fprintf(stderr, "stubbed glFramebufferTexture2D...\n");
+    }
+}
+
+}// End of extern "C" 
 
 //**************************************************************************************
 // Name: glDraw_XXX
