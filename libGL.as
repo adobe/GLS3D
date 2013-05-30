@@ -2865,6 +2865,8 @@ class Light
     public var ambient:Vector.<Number>
     public var diffuse:Vector.<Number>
     public var specular:Vector.<Number>
+    public var type:uint
+
     // FIXME (klin): No spotlight for now...neverball doesn't use it
     
     public function Light(init:Boolean = false, isLight0:Boolean = false)
@@ -2877,6 +2879,7 @@ class Light
                                    new <Number>[0, 0, 0, 1]
             specular = (isLight0) ? new <Number>[1, 1, 1, 1] :
                                     new <Number>[0, 0, 0, 1]
+            type = LIGHT_TYPE_POINT;
         }
     }
     
@@ -2887,6 +2890,7 @@ class Light
         clone.ambient = (ambient) ? ambient.concat() : null
         clone.diffuse = (diffuse) ? diffuse.concat() : null
         clone.specular = (specular) ? specular.concat() : null
+        clone.type = type;
         return clone
     }
 }

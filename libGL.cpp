@@ -660,7 +660,6 @@ struct StateInfo {
 int activeTextureUnit = GL_TEXTURE0;
 
 struct ArrayEXTState {
-    StateInfo verts, colors, texcoords[GL_MAX_TEXTURE_COORDS];
     StateInfo verts;
 	StateInfo colors;
 	StateInfo normals;
